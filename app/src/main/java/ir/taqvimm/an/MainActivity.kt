@@ -1,5 +1,4 @@
 
-
 package ir.taqvimm.an
 
 import android.content.Intent
@@ -14,7 +13,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import android.icu.util.PersianCalendar
 import android.icu.util.Calendar
 import android.icu.util.TimeZone
 import java.util.Locale
@@ -23,6 +21,8 @@ class MainActivity : AppCompatActivity() {
 
     private val green = Color.rgb(16, 77, 67)
     private val light = Color.rgb(245, 248, 246)
+
+    private lateinit var displayedMonth: Calendar
 
     private val months = arrayOf(
         "فروردین", "اردیبهشت", "خرداد",
@@ -36,14 +36,17 @@ class MainActivity : AppCompatActivity() {
         "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"
     )
 
-    private lateinit var displayedMonth: PersianCalendar
+    private fun newPersianCalendar(): Calendar {
+        return Calendar.getInstance(
+            TimeZone.getTimeZone("Asia/Tehran"),
+            Locale.forLanguageTag("fa-IR-u-ca-persian")
+        )
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        displayedMonth = PersianCalendar(Locale("fa", "IR"))
-        displayedMonth.timeZone =
-            TimeZone.getTimeZone("Asia/Tehran")
+        displayedMonth = newPersianCalendar()
         displayedMonth.timeInMillis = System.currentTimeMillis()
 
         showHome()
@@ -84,6 +87,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun buttonParams(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            62
+        ).apply {
+            setMargins(0, 8, 0, 8)
+        }
+    }
+
     private fun showHome() {
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
@@ -91,13 +103,8 @@ class MainActivity : AppCompatActivity() {
         root.setPadding(24, 35, 24, 24)
         root.setBackgroundColor(light)
 
-        root.addView(
-            makeText("🌙 تقویم من", 30f, green)
-        )
-
-        root.addView(
-            makeText("همراه روزهای خوب زندگی", 17f)
-        )
+        root.addView(makeText("🌙 تقویم من", 30f, green))
+        root.addView(makeText("همراه روزهای خوب زندگی", 17f))
 
         root.addView(makeButton("📅 تقویم شمسی") {
             showCalendar()
@@ -148,15 +155,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(root)
     }
 
-    private fun buttonParams(): LinearLayout.LayoutParams {
-        return LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            62
-        ).apply {
-            setMargins(0, 8, 0, 8)
-        }
-    }
-
     private fun showCalendar() {
         val scroll = ScrollView(this)
 
@@ -167,12 +165,9 @@ class MainActivity : AppCompatActivity() {
 
         scroll.addView(root)
 
-        root.addView(
-            makeText("📅 تقویم شمسی", 27f, green)
-        )
+        root.addView(makeText("📅 تقویم شمسی", 27f, green))
 
-        val today = PersianCalendar(Locale("fa", "IR"))
-        today.timeZone = TimeZone.getTimeZone("Asia/Tehran")
+        val today = newPersianCalendar()
         today.timeInMillis = System.currentTimeMillis()
 
         val todayText = makeText(
@@ -206,9 +201,20 @@ class MainActivity : AppCompatActivity() {
             showCalendar()
         }
 
-        navigation.addView(previous, LinearLayout.LayoutParams(0, 55, 1f))
-        navigation.addView(currentMonth, LinearLayout.LayoutParams(0, 55, 1f))
-        navigation.addView(next, LinearLayout.LayoutParams(0, 55, 1f))
+        navigation.addView(
+            previous,
+            LinearLayout.LayoutParams(0, 55, 1f)
+        )
+
+        navigation.addView(
+            currentMonth,
+            LinearLayout.LayoutParams(0, 55, 1f)
+        )
+
+        navigation.addView(
+            next,
+            LinearLayout.LayoutParams(0, 55, 1f)
+        )
 
         root.addView(navigation)
 
@@ -229,14 +235,17 @@ class MainActivity : AppCompatActivity() {
         grid.useDefaultMargins = true
 
         for (dayName in weekdays) {
-            val cell = makeText(dayName, 12f, green)
-            grid.addView(cell, gridParams())
+            grid.addView(
+                makeText(dayName, 12f, green),
+                gridParams()
+            )
         }
 
-        val firstDay = displayedMonth.clone() as PersianCalendar
+        val firstDay = displayedMonth.clone() as Calendar
         firstDay.set(Calendar.DAY_OF_MONTH, 1)
 
         val offset = firstDay.get(Calendar.DAY_OF_WEEK) % 7
+
         val daysInMonth =
             displayedMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
 
@@ -290,4 +299,3 @@ class MainActivity : AppCompatActivity() {
         }
     }
 }
-
