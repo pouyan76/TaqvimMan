@@ -1,6 +1,7 @@
 
 package ir.taqvimm.an
 
+import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -14,10 +15,9 @@ import android.widget.TextView
 import android.widget.Toast
 import android.icu.util.Calendar
 import android.icu.util.TimeZone
-import androidx.appcompat.app.AppCompatActivity
 import java.util.Locale
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private val green = Color.rgb(16, 77, 67)
     private val gold = Color.rgb(205, 155, 65)
@@ -206,7 +206,6 @@ class MainActivity : AppCompatActivity() {
             label("${months[month]} ${fa(year)}", 23f)
         )
 
-        // دکمه‌های ماه قبل و بعد با عرض مساوی
         val navigation = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -257,6 +256,7 @@ class MainActivity : AppCompatActivity() {
 
         for (name in weekdays) {
             val color = if (name == "جمعه") red else green
+
             grid.addView(
                 label(name, 10f, color),
                 gridParams()
@@ -267,7 +267,9 @@ class MainActivity : AppCompatActivity() {
         firstDay.set(Calendar.DAY_OF_MONTH, 1)
 
         val offset = firstDay.get(Calendar.DAY_OF_WEEK) % 7
-        val days = displayedMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val days = displayedMonth.getActualMaximum(
+            Calendar.DAY_OF_MONTH
+        )
 
         repeat(offset) {
             grid.addView(label("", 14f), gridParams())
@@ -277,7 +279,8 @@ class MainActivity : AppCompatActivity() {
             val date = displayedMonth.clone() as Calendar
             date.set(Calendar.DAY_OF_MONTH, day)
 
-            val isFriday = date.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
+            val isFriday =
+                date.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
 
             val isToday =
                 year == today.get(Calendar.YEAR) &&
@@ -302,6 +305,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         root.addView(grid)
+
         root.addView(
             actionButton("🏠 بازگشت به صفحه اصلی") {
                 showHome()
@@ -309,7 +313,10 @@ class MainActivity : AppCompatActivity() {
             buttonParams()
         )
 
-        root.addView(label("جمعه‌ها با رنگ قرمز مشخص شده‌اند", 13f, red))
+        root.addView(
+            label("جمعه‌ها با رنگ قرمز مشخص شده‌اند", 13f, red)
+        )
+
         root.addView(label("Pouyan • Taqvim Man", 13f, gold))
 
         setContentView(scroll)
@@ -319,7 +326,10 @@ class MainActivity : AppCompatActivity() {
         return GridLayout.LayoutParams().apply {
             width = 0
             height = 54
-            columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            columnSpec = GridLayout.spec(
+                GridLayout.UNDEFINED,
+                1f
+            )
             setMargins(2, 3, 2, 3)
         }
     }
