@@ -13,15 +13,16 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.icu.util.Calendar
-import android.icu.util.TimeZone
 import android.view.Gravity
 import android.view.View
 import android.widget.GridLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import android.icu.util.Calendar
+import android.icu.util.TimeZone
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -35,10 +36,11 @@ class MainActivity : Activity() {
     private val green = Color.rgb(14, 65, 57)
     private val greenLight = Color.rgb(35, 111, 91)
     private val gold = Color.rgb(218, 171, 91)
-    private val background = Color.rgb(245, 247, 245)
+    private val background = Color.rgb(239, 245, 249)
     private val white = Color.WHITE
     private val red = Color.rgb(190, 55, 55)
-    private val gray = Color.rgb(110, 120, 116)
+    private val gray = Color.rgb(110, 120, 130)
+    private val sky = Color.rgb(39, 91, 145)
 
     private lateinit var displayedMonth: Calendar
 
@@ -52,6 +54,7 @@ class MainActivity : Activity() {
     private lateinit var prayerBox: LinearLayout
     private lateinit var weatherBox: LinearLayout
 
+    private var locationMode = "all"
     private val permissionCode = 501
 
     private val months = arrayOf(
@@ -66,18 +69,20 @@ class MainActivity : Activity() {
         "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"
     )
 
+    private val englishDays = arrayOf(
+        "یکشنبه", "دوشنبه", "سه‌شنبه",
+        "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         displayedMonth = newPersianCalendar()
         displayedMonth.timeInMillis = System.currentTimeMillis()
-
         showHome()
     }
 
-    private fun dp(value: Int): Int {
-        return (value * resources.displayMetrics.density).toInt()
-    }
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density).toInt()
 
     private fun newPersianCalendar(): Calendar {
         return Calendar.getInstance(
@@ -106,12 +111,25 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun gradient(): GradientDrawable {
+    private fun skyGradient(): GradientDrawable {
+        return GradientDrawable(
+            GradientDrawable.Orientation.TL_BR,
+            intArrayOf(
+                Color.rgb(31, 91, 151),
+                Color.rgb(87, 151, 194),
+                Color.rgb(172, 202, 218)
+            )
+        ).apply {
+            cornerRadius = dp(24).toFloat()
+        }
+    }
+
+    private fun greenGradient(): GradientDrawable {
         return GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(green, greenLight)
         ).apply {
-            cornerRadius = dp(26).toFloat()
+            cornerRadius = dp(24).toFloat()
         }
     }
 
@@ -179,7 +197,6 @@ class MainActivity : Activity() {
         card.addView(text(emoji, 34f))
         card.addView(text(title, 16f, green, true))
         card.addView(text(description, 11f, gray))
-
         return card
     }
 
@@ -195,7 +212,7 @@ class MainActivity : Activity() {
 
         row.addView(
             first,
-            LinearLayout.LayoutParams(0, dp(150), 1f).apply {
+            LinearLayout.LayoutParams(0, dp(145), 1f).apply {
                 marginStart = dp(5)
                 marginEnd = dp(5)
             }
@@ -203,7 +220,7 @@ class MainActivity : Activity() {
 
         row.addView(
             second,
-            LinearLayout.LayoutParams(0, dp(150), 1f).apply {
+            LinearLayout.LayoutParams(0, dp(145), 1f).apply {
                 marginStart = dp(5)
                 marginEnd = dp(5)
             }
@@ -218,7 +235,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            background = gradient()
+            background = greenGradient()
             setPadding(dp(18), dp(22), dp(18), dp(22))
             elevation = dp(4).toFloat()
         }
@@ -226,15 +243,10 @@ class MainActivity : Activity() {
         header.addView(text("تقویم من", 30f, white, true))
         header.addView(text("همراه هوشمند هر روز شما", 14f, white))
         header.addView(text("POUYAN • TAQVIM MAN", 11f, gold, true))
-
         root.addView(header, params(0, 12))
 
         val today = newPersianCalendar()
         today.timeInMillis = System.currentTimeMillis()
-
-        val day = today.get(Calendar.DAY_OF_MONTH)
-        val month = today.get(Calendar.MONTH)
-        val year = today.get(Calendar.YEAR)
 
         val dateCard = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -247,7 +259,9 @@ class MainActivity : Activity() {
         dateCard.addView(text("امروز در تقویم شمسی", 13f, gray))
         dateCard.addView(
             text(
-                "${fa(day)} ${months[month]} ${fa(year)}",
+                "${fa(today.get(Calendar.DAY_OF_MONTH))} " +
+                "${months[today.get(Calendar.MONTH)]} " +
+                fa(today.get(Calendar.YEAR)),
                 23f,
                 green,
                 true
@@ -256,8 +270,8 @@ class MainActivity : Activity() {
 
         val weekIndex = (today.get(Calendar.DAY_OF_WEEK) + 5) % 7
         dateCard.addView(text(weekdays[weekIndex], 14f, gold, true))
-
         root.addView(dateCard, params(0, 14))
+
         root.addView(text("خدمات برنامه", 19f, green, true))
 
         addFeatureRow(
@@ -266,14 +280,14 @@ class MainActivity : Activity() {
                 showCalendar()
             },
             featureCard("🕌", "اوقات شرعی", "بر اساس مکان گوشی") {
-                showLiveInfo()
+                showLiveInfo("prayer")
             }
         )
 
         addFeatureRow(
             root,
-            featureCard("🌤️", "هواشناسی آنلاین", "آب‌وهوای مکان شما") {
-                showLiveInfo()
+            featureCard("🌤️", "هواشناسی آنلاین", "پیش‌بینی ۷ روز آینده") {
+                showLiveInfo("weather")
             },
             featureCard("🎮", "بازی کلمات", "۵۰۰ مرحله سرگرمی") {
                 Toast.makeText(
@@ -287,45 +301,43 @@ class MainActivity : Activity() {
         val footer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            background = shape(green, 18)
+            background = greenGradient()
             setPadding(dp(12), dp(12), dp(12), dp(12))
         }
 
-        footer.addView(
-            text("اطلاعات آنلاین بر اساس موقعیت شما", 13f, white)
-        )
-        footer.addView(
-            text("ساخته شده با ❤️ توسط Pouyan", 12f, gold)
-        )
-
+        footer.addView(text("اطلاعات آنلاین بر اساس موقعیت شما", 13f, white))
+        footer.addView(text("ساخته شده با ❤️ توسط Pouyan", 12f, gold))
         root.addView(footer, params(16, 4))
 
         setContentView(scroll)
     }
 
-    // صفحه اطلاعات زنده مکان
-    private fun showLiveInfo() {
+    // صفحه اطلاعات زنده
+    private fun showLiveInfo(mode: String) {
+        locationMode = mode
+
         val (scroll, root) = page()
 
         root.addView(
-            text("🌍 اطلاعات آنلاین مکان شما", 24f, green, true)
+            text(
+                if (mode == "weather") "🌤️ هواشناسی ۷ روز آینده"
+                else "🕌 اوقات شرعی مکان شما",
+                24f,
+                green,
+                true
+            )
         )
 
         root.addView(
-            text("اوقات شرعی و هواشناسی بر اساس موقعیت گوشی", 13f, gray)
+            text("اطلاعات بر اساس موقعیت فعلی گوشی", 13f, gray)
         )
 
         liveStatus = text(
             "برای دریافت اطلاعات، موقعیت مکانی را تأیید کنید.",
-            15f,
+            14f,
             gold
         )
         root.addView(liveStatus, params())
-
-        root.addView(
-            text("🕌 اوقات شرعی", 20f, green, true),
-            params(12, 4)
-        )
 
         prayerBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -334,16 +346,6 @@ class MainActivity : Activity() {
             elevation = dp(2).toFloat()
         }
 
-        prayerBox.addView(
-            text("هنوز اطلاعاتی دریافت نشده است", 14f, gray)
-        )
-        root.addView(prayerBox, params())
-
-        root.addView(
-            text("🌤️ وضعیت هوا", 20f, green, true),
-            params(12, 4)
-        )
-
         weatherBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             background = shape(white, 20)
@@ -351,13 +353,16 @@ class MainActivity : Activity() {
             elevation = dp(2).toFloat()
         }
 
-        weatherBox.addView(
-            text("هنوز اطلاعاتی دریافت نشده است", 14f, gray)
-        )
-        root.addView(weatherBox, params())
+        if (mode == "weather") {
+            root.addView(weatherBox, params())
+            root.addView(prayerBox, params())
+        } else {
+            root.addView(prayerBox, params())
+            root.addView(weatherBox, params())
+        }
 
         root.addView(
-            featureCard("🔄", "به‌روزرسانی اطلاعات", "دریافت دوباره موقعیت و اطلاعات") {
+            featureCard("🔄", "به‌روزرسانی", "دریافت دوباره اطلاعات") {
                 beginLocation()
             },
             params(12, 6)
@@ -371,7 +376,6 @@ class MainActivity : Activity() {
         )
 
         setContentView(scroll)
-
         beginLocation()
     }
 
@@ -389,7 +393,7 @@ class MainActivity : Activity() {
 
     private fun beginLocation() {
         if (!hasLocationPermission()) {
-            liveStatus.text = "برای ادامه، اجازه دسترسی به مکان را بدهید."
+            liveStatus.text = "لطفاً اجازه دسترسی به مکان را بدهید."
 
             requestPermissions(
                 arrayOf(
@@ -420,7 +424,7 @@ class MainActivity : Activity() {
                 findPhoneLocation()
             } else {
                 liveStatus.text =
-                    "بدون اجازه مکان‌یابی نمی‌توان اطلاعات محلی را دریافت کرد."
+                    "برای نمایش اطلاعات محلی باید اجازه مکان‌یابی بدهید."
             }
         }
     }
@@ -433,12 +437,11 @@ class MainActivity : Activity() {
                 getSystemService(LOCATION_SERVICE) as LocationManager
 
             val manager = locationManager!!
-
             val providers = manager.getProviders(true)
 
             if (providers.isEmpty()) {
                 liveStatus.text =
-                    "مکان‌یابی گوشی خاموش است. لطفاً GPS را روشن کنید."
+                    "مکان‌یابی خاموش است. لطفاً GPS گوشی را روشن کنید."
                 return
             }
 
@@ -473,14 +476,13 @@ class MainActivity : Activity() {
                 }
 
                 override fun onProviderEnabled(provider: String) {}
-
                 override fun onProviderDisabled(provider: String) {}
 
                 @Deprecated("Deprecated in Android")
                 override fun onStatusChanged(
                     provider: String?,
                     status: Int,
-                    extras: android.os.Bundle?
+                    extras: Bundle?
                 ) {}
             }
 
@@ -519,13 +521,11 @@ class MainActivity : Activity() {
                 locationManager?.removeUpdates(it)
             }
         } catch (e: Exception) {
-            // Ignore location cleanup errors.
+            // Ignore cleanup errors.
         }
-
         locationListener = null
     }
 
-    // دریافت هم‌زمان اوقات شرعی و هواشناسی
     private fun loadOnlineInformation(location: Location) {
         liveStatus.text = "موقعیت پیدا شد؛ اطلاعات آنلاین دریافت می‌شود..."
 
@@ -533,8 +533,10 @@ class MainActivity : Activity() {
         val longitude = location.longitude
 
         executor.execute {
-            var prayerResult = "دریافت اوقات شرعی ناموفق بود."
-            var weatherResult = "دریافت هواشناسی ناموفق بود."
+            var prayerData: List<Pair<String, String>>? = null
+            var weatherData: JSONObject? = null
+            var prayerError = ""
+            var weatherError = ""
 
             try {
                 val timestamp = System.currentTimeMillis() / 1000L
@@ -548,7 +550,7 @@ class MainActivity : Activity() {
                     .getJSONObject("data")
                     .getJSONObject("timings")
 
-                val prayerNames = listOf(
+                val names = listOf(
                     "اذان صبح" to "Fajr",
                     "طلوع آفتاب" to "Sunrise",
                     "اذان ظهر" to "Dhuhr",
@@ -558,12 +560,12 @@ class MainActivity : Activity() {
                     "اذان عشا" to "Isha"
                 )
 
-                prayerResult = prayerNames.joinToString("\n") {
-                    "${it.first} : ${faTime(timings.getString(it.second).take(5))}"
+                prayerData = names.map {
+                    it.first to timings.getString(it.second).take(5)
                 }
 
             } catch (e: Exception) {
-                prayerResult = "اوقات شرعی دریافت نشد. اینترنت را بررسی کنید."
+                prayerError = "دریافت اوقات شرعی ناموفق بود."
             }
 
             try {
@@ -572,45 +574,53 @@ class MainActivity : Activity() {
                     "?latitude=$latitude&longitude=$longitude" +
                     "&current=temperature_2m,relative_humidity_2m," +
                     "apparent_temperature,precipitation,weather_code,wind_speed_10m" +
-                    "&timezone=auto"
+                    "&daily=weather_code,temperature_2m_max,temperature_2m_min," +
+                    "precipitation_probability_max,wind_speed_10m_max" +
+                    "&forecast_days=7&timezone=auto"
 
-                val weatherJson = JSONObject(readUrl(weatherUrl))
-                val current = weatherJson.getJSONObject("current")
-
-                val temperature = current.getDouble("temperature_2m")
-                val feels = current.getDouble("apparent_temperature")
-                val humidity = current.getInt("relative_humidity_2m")
-                val wind = current.getDouble("wind_speed_10m")
-                val code = current.getInt("weather_code")
-
-                val description = weatherDescription(code)
-
-                weatherResult =
-                    "وضعیت: $description\n" +
-                    "دمای هوا: ${faTime(String.format(Locale.US, "%.1f", temperature))} درجه\n" +
-                    "دمای احساسی: ${faTime(String.format(Locale.US, "%.1f", feels))} درجه\n" +
-                    "رطوبت: ${fa(humidity)} درصد\n" +
-                    "سرعت باد: ${faTime(String.format(Locale.US, "%.1f", wind))} کیلومتر بر ساعت"
+                weatherData = JSONObject(readUrl(weatherUrl))
 
             } catch (e: Exception) {
-                weatherResult = "هواشناسی دریافت نشد. اینترنت را بررسی کنید."
+                weatherError = "دریافت هواشناسی ناموفق بود."
             }
 
             runOnUiThread {
                 prayerBox.removeAllViews()
                 weatherBox.removeAllViews()
 
-                prayerBox.addView(
-                    text(prayerResult, 16f, green)
-                )
+                if (prayerData != null) {
+                    prayerBox.addView(
+                        text("اوقات شرعی امروز", 18f, green, true)
+                    )
 
-                weatherBox.addView(
-                    text(weatherResult, 16f, green)
-                )
+                    for ((name, time) in prayerData!!) {
+                        prayerBox.addView(
+                            text(
+                                "$name      ${faTime(time)}",
+                                16f,
+                                green
+                            )
+                        )
+                    }
+                } else {
+                    prayerBox.addView(
+                        text(prayerError, 14f, red)
+                    )
+                }
+
+                if (weatherData != null) {
+                    displayWeather(weatherData!!)
+                } else {
+                    weatherBox.addView(
+                        text(weatherError, 14f, red)
+                    )
+                }
 
                 liveStatus.text =
-                    "موقعیت: ${String.format(Locale.US, "%.3f", latitude)}, " +
-                    "${String.format(Locale.US, "%.3f", longitude)}"
+                    "موقعیت فعلی: " +
+                    String.format(Locale.US, "%.3f", latitude) +
+                    " , " +
+                    String.format(Locale.US, "%.3f", longitude)
 
                 liveStatus.setTextColor(green)
             }
@@ -618,7 +628,8 @@ class MainActivity : Activity() {
     }
 
     private fun readUrl(address: String): String {
-        val connection = URL(address).openConnection() as HttpURLConnection
+        val connection =
+            URL(address).openConnection() as HttpURLConnection
 
         try {
             connection.requestMethod = "GET"
@@ -638,10 +649,208 @@ class MainActivity : Activity() {
         }
     }
 
+    // ساخت کارت هواشناسی و پیش‌بینی ۷ روزه
+    private fun displayWeather(json: JSONObject) {
+        weatherBox.removeAllViews()
+
+        val current = json.getJSONObject("current")
+        val daily = json.getJSONObject("daily")
+
+        val temperature = current.getDouble("temperature_2m")
+        val feels = current.getDouble("apparent_temperature")
+        val humidity = current.getInt("relative_humidity_2m")
+        val wind = current.getDouble("wind_speed_10m")
+        val currentCode = current.getInt("weather_code")
+
+        val currentCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = skyGradient()
+            setPadding(dp(14), dp(18), dp(14), dp(18))
+            elevation = dp(3).toFloat()
+        }
+
+        currentCard.addView(
+            text("وضعیت فعلی هوا", 16f, white, true)
+        )
+
+        currentCard.addView(
+            text(weatherIcon(currentCode), 48f, white)
+        )
+
+        currentCard.addView(
+            text(
+                "${faTime(String.format(Locale.US, "%.1f", temperature))}°",
+                43f,
+                white,
+                true
+            )
+        )
+
+        currentCard.addView(
+            text(weatherDescription(currentCode), 18f, white, true)
+        )
+
+        val maxToday = daily.getJSONArray("temperature_2m_max").getDouble(0)
+        val minToday = daily.getJSONArray("temperature_2m_min").getDouble(0)
+
+        currentCard.addView(
+            text(
+                "بیشینه ${faTime(String.format(Locale.US, "%.0f", maxToday))}°  " +
+                " |  کمینه ${faTime(String.format(Locale.US, "%.0f", minToday))}°",
+                15f,
+                white
+            )
+        )
+
+        currentCard.addView(
+            text(
+                "احساسی ${faTime(String.format(Locale.US, "%.1f", feels))}°" +
+                "   •   رطوبت ${fa(humidity)}٪" +
+                "   •   باد ${faTime(String.format(Locale.US, "%.0f", wind))}",
+                12f,
+                white
+            )
+        )
+
+        weatherBox.addView(currentCard, params(4, 14))
+
+        weatherBox.addView(
+            text("پیش‌بینی ۷ روز آینده", 19f, green, true),
+            params(8, 4)
+        )
+
+        val horizontal = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+        }
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
+
+        val dates = daily.getJSONArray("time")
+        val codes = daily.getJSONArray("weather_code")
+        val maxTemps = daily.getJSONArray("temperature_2m_max")
+        val minTemps = daily.getJSONArray("temperature_2m_min")
+        val rain = daily.getJSONArray("precipitation_probability_max")
+        val winds = daily.getJSONArray("wind_speed_10m_max")
+
+        for (i in 0 until dates.length()) {
+            val date = dates.getString(i)
+            val dayName = getDayName(date)
+
+            val code = codes.getInt(i)
+            val max = maxTemps.getDouble(i)
+            val min = minTemps.getDouble(i)
+            val rainChance = if (rain.isNull(i)) 0 else rain.getInt(i)
+            val windSpeed = winds.getDouble(i)
+
+            val dayCard = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                background = shape(
+                    if (i == 0) Color.rgb(224, 239, 246) else white,
+                    16
+                )
+                elevation = dp(2).toFloat()
+                setPadding(dp(9), dp(12), dp(9), dp(12))
+            }
+
+            dayCard.addView(
+                text(dayName, 12f, green, true)
+            )
+
+            dayCard.addView(
+                text(weatherIcon(code), 27f)
+            )
+
+            dayCard.addView(
+                text(
+                    "${faTime(String.format(Locale.US, "%.0f", max))}°",
+                    16f,
+                    green,
+                    true
+                )
+            )
+
+            dayCard.addView(
+                text(
+                    "${faTime(String.format(Locale.US, "%.0f", min))}°",
+                    13f,
+                    gray
+                )
+            )
+
+            dayCard.addView(
+                text("☔ ${fa(rainChance)}٪", 11f, sky)
+            )
+
+            dayCard.addView(
+                text(
+                    "باد ${faTime(String.format(Locale.US, "%.0f", windSpeed))}",
+                    10f,
+                    gray
+                )
+            )
+
+            row.addView(
+                dayCard,
+                LinearLayout.LayoutParams(
+                    dp(100),
+                    dp(170)
+                ).apply {
+                    setMargins(dp(4), dp(4), dp(4), dp(4))
+                }
+            )
+        }
+
+        horizontal.addView(row)
+
+        weatherBox.addView(horizontal, params(0, 12))
+
+        weatherBox.addView(
+            text(
+                "دمای فعلی بر اساس موقعیت شما • پیش‌بینی آنلاین",
+                11f,
+                gray
+            )
+        )
+    }
+
+    private fun getDayName(date: String): String {
+        return try {
+            val format = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+            val parsed = format.parse(date) ?: return date
+            val calendar = java.util.Calendar.getInstance()
+            calendar.time = parsed
+            englishDays[calendar.get(java.util.Calendar.DAY_OF_WEEK) - 1]
+        } catch (e: Exception) {
+            date
+        }
+    }
+
+    private fun weatherIcon(code: Int): String {
+        return when (code) {
+            0 -> "☀️"
+            1, 2 -> "🌤️"
+            3 -> "☁️"
+            45, 48 -> "🌫️"
+            51, 53, 55, 56, 57 -> "🌦️"
+            61, 63, 65, 66, 67 -> "🌧️"
+            71, 73, 75, 77 -> "❄️"
+            80, 81, 82 -> "🌧️"
+            85, 86 -> "🌨️"
+            95, 96, 99 -> "⛈️"
+            else -> "🌤️"
+        }
+    }
+
     private fun weatherDescription(code: Int): String {
         return when (code) {
             0 -> "آسمان صاف"
-            1, 2 -> "کمی ابری"
+            1 -> "عمدتاً صاف"
+            2 -> "نیمه‌ابری"
             3 -> "ابری"
             45, 48 -> "مه‌آلود"
             51, 53, 55 -> "نم‌نم باران"
