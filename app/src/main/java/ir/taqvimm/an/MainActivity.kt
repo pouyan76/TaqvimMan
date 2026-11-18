@@ -1,11 +1,20 @@
 
 package ir.taqvimm.an
 
+import android.Manifest
 import android.app.Activity
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.icu.util.Calendar
+import android.icu.util.TimeZone
 import android.view.Gravity
 import android.view.View
 import android.widget.GridLayout
@@ -13,8 +22,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import android.icu.util.Calendar
-import android.icu.util.TimeZone
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -34,7 +41,18 @@ class MainActivity : Activity() {
     private val gray = Color.rgb(110, 120, 116)
 
     private lateinit var displayedMonth: Calendar
+
     private val executor = Executors.newSingleThreadExecutor()
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var locationManager: LocationManager? = null
+    private var locationListener: LocationListener? = null
+
+    private lateinit var liveStatus: TextView
+    private lateinit var prayerBox: LinearLayout
+    private lateinit var weatherBox: LinearLayout
+
+    private val permissionCode = 501
 
     private val months = arrayOf(
         "فروردین", "اردیبهشت", "خرداد",
@@ -50,8 +68,10 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         displayedMonth = newPersianCalendar()
         displayedMonth.timeInMillis = System.currentTimeMillis()
+
         showHome()
     }
 
@@ -79,10 +99,7 @@ class MainActivity : Activity() {
         }.joinToString("")
     }
 
-    private fun shape(
-        color: Int,
-        radius: Int
-    ): GradientDrawable {
+    private fun shape(color: Int, radius: Int): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
@@ -146,7 +163,6 @@ class MainActivity : Activity() {
         emoji: String,
         title: String,
         description: String,
-        color: Int,
         action: () -> Unit
     ): LinearLayout {
         val card = LinearLayout(this).apply {
@@ -160,30 +176,9 @@ class MainActivity : Activity() {
             setOnClickListener { action() }
         }
 
-        val icon = text(emoji, 34f)
-        card.addView(icon)
-
-        card.addView(
-            text(title, 16f, green, true)
-        )
-
-        card.addView(
-            text(description, 11f, gray)
-        )
-
-        val line = View(this).apply {
-            setBackgroundColor(color)
-        }
-
-        card.addView(
-            line,
-            LinearLayout.LayoutParams(
-                dp(38),
-                dp(3)
-            ).apply {
-                topMargin = dp(8)
-            }
-        )
+        card.addView(text(emoji, 34f))
+        card.addView(text(title, 16f, green, true))
+        card.addView(text(description, 11f, gray))
 
         return card
     }
@@ -220,7 +215,6 @@ class MainActivity : Activity() {
     private fun showHome() {
         val (scroll, root) = page()
 
-        // سربرگ برنامه
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -229,21 +223,12 @@ class MainActivity : Activity() {
             elevation = dp(4).toFloat()
         }
 
-        header.addView(
-            text("تقویم من", 30f, white, true)
-        )
-
-        header.addView(
-            text("یک همراه هوشمند برای هر روز شما", 14f, white)
-        )
-
-        header.addView(
-            text("POUYAN  •  TAQVIM MAN", 11f, gold, true)
-        )
+        header.addView(text("تقویم من", 30f, white, true))
+        header.addView(text("همراه هوشمند هر روز شما", 14f, white))
+        header.addView(text("POUYAN • TAQVIM MAN", 11f, gold, true))
 
         root.addView(header, params(0, 12))
 
-        // تاریخ امروز
         val today = newPersianCalendar()
         today.timeInMillis = System.currentTimeMillis()
 
@@ -259,10 +244,7 @@ class MainActivity : Activity() {
             setPadding(dp(12), dp(12), dp(12), dp(12))
         }
 
-        dateCard.addView(
-            text("امروز در تقویم شمسی", 13f, gray)
-        )
-
+        dateCard.addView(text("امروز در تقویم شمسی", 13f, gray))
         dateCard.addView(
             text(
                 "${fa(day)} ${months[month]} ${fa(year)}",
@@ -272,64 +254,28 @@ class MainActivity : Activity() {
             )
         )
 
-        val weekDay = today.get(Calendar.DAY_OF_WEEK)
-        val weekIndex = (weekDay + 5) % 7
-
-        dateCard.addView(
-            text(weekdays[weekIndex], 14f, gold, true)
-        )
+        val weekIndex = (today.get(Calendar.DAY_OF_WEEK) + 5) % 7
+        dateCard.addView(text(weekdays[weekIndex], 14f, gold, true))
 
         root.addView(dateCard, params(0, 14))
+        root.addView(text("خدمات برنامه", 19f, green, true))
 
-        root.addView(
-            text("خدمات برنامه", 19f, green, true)
-        )
-
-        root.addView(
-            text("یکی از بخش‌های زیر را انتخاب کنید", 12f, gray)
-        )
-
-        // کارت‌های اصلی
         addFeatureRow(
             root,
-            featureCard(
-                "📅",
-                "تقویم شمسی",
-                "روزها و ماه‌های سال",
-                green
-            ) {
+            featureCard("📅", "تقویم شمسی", "روزها و ماه‌های سال") {
                 showCalendar()
             },
-            featureCard(
-                "🕌",
-                "اوقات شرعی",
-                "اذان و زمان نماز شیراز",
-                gold
-            ) {
-                showPrayerTimes()
+            featureCard("🕌", "اوقات شرعی", "بر اساس مکان گوشی") {
+                showLiveInfo()
             }
         )
 
         addFeatureRow(
             root,
-            featureCard(
-                "🌤️",
-                "هواشناسی",
-                "آب‌وهوای شیراز",
-                Color.rgb(65, 145, 190)
-            ) {
-                Toast.makeText(
-                    this,
-                    "بخش هواشناسی در حال آماده‌سازی است",
-                    Toast.LENGTH_SHORT
-                ).show()
+            featureCard("🌤️", "هواشناسی آنلاین", "آب‌وهوای مکان شما") {
+                showLiveInfo()
             },
-            featureCard(
-                "🎮",
-                "بازی کلمات",
-                "۵۰۰ مرحله سرگرمی",
-                Color.rgb(150, 100, 180)
-            ) {
+            featureCard("🎮", "بازی کلمات", "۵۰۰ مرحله سرگرمی") {
                 Toast.makeText(
                     this,
                     "بخش بازی در حال آماده‌سازی است",
@@ -338,7 +284,6 @@ class MainActivity : Activity() {
             }
         )
 
-        // نوار پایینی
         val footer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -347,9 +292,8 @@ class MainActivity : Activity() {
         }
 
         footer.addView(
-            text("با تقویم من، روزهای خود را بهتر مدیریت کنید", 13f, white)
+            text("اطلاعات آنلاین بر اساس موقعیت شما", 13f, white)
         )
-
         footer.addView(
             text("ساخته شده با ❤️ توسط Pouyan", 12f, gold)
         )
@@ -359,142 +303,359 @@ class MainActivity : Activity() {
         setContentView(scroll)
     }
 
-    private fun showPrayerTimes() {
+    // صفحه اطلاعات زنده مکان
+    private fun showLiveInfo() {
         val (scroll, root) = page()
 
         root.addView(
-            text("🕌 اوقات شرعی شیراز", 25f, green, true),
-            params(5, 5)
+            text("🌍 اطلاعات آنلاین مکان شما", 24f, green, true)
         )
 
         root.addView(
-            text("استان فارس • ایران", 14f, gold)
+            text("اوقات شرعی و هواشناسی بر اساس موقعیت گوشی", 13f, gray)
         )
 
-        val dateFormat = SimpleDateFormat(
-            "dd-MM-yyyy",
-            Locale.US
-        )
-
-        dateFormat.timeZone =
-            java.util.TimeZone.getTimeZone("Asia/Tehran")
-
-        val today = dateFormat.format(Date())
-
-        root.addView(
-            text("تاریخ: $today", 14f, gray)
-        )
-
-        val status = text(
-            "در حال دریافت زمان اذان...",
+        liveStatus = text(
+            "برای دریافت اطلاعات، موقعیت مکانی را تأیید کنید.",
             15f,
             gold
         )
+        root.addView(liveStatus, params())
 
-        root.addView(status, params())
+        root.addView(
+            text("🕌 اوقات شرعی", 20f, green, true),
+            params(12, 4)
+        )
 
-        val prayerBox = LinearLayout(this).apply {
+        prayerBox = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = shape(white, 22)
+            background = shape(white, 20)
             setPadding(dp(12), dp(12), dp(12), dp(12))
-            elevation = dp(3).toFloat()
+            elevation = dp(2).toFloat()
         }
 
+        prayerBox.addView(
+            text("هنوز اطلاعاتی دریافت نشده است", 14f, gray)
+        )
         root.addView(prayerBox, params())
 
-        val names = listOf(
-            "اذان صبح" to "Fajr",
-            "طلوع آفتاب" to "Sunrise",
-            "اذان ظهر" to "Dhuhr",
-            "اذان عصر" to "Asr",
-            "غروب آفتاب" to "Sunset",
-            "اذان مغرب" to "Maghrib",
-            "اذان عشا" to "Isha"
+        root.addView(
+            text("🌤️ وضعیت هوا", 20f, green, true),
+            params(12, 4)
         )
 
-        executor.execute {
-            var connection: HttpURLConnection? = null
-
-            try {
-                val url = URL(
-                    "https://api.aladhan.com/v1/timings/$today" +
-                    "?latitude=29.5918&longitude=52.5837&method=7"
-                )
-
-                connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
-                connection.requestMethod = "GET"
-
-                if (connection.responseCode !in 200..299) {
-                    throw Exception("Network error")
-                }
-
-                val response = connection.inputStream
-                    .bufferedReader()
-                    .use { it.readText() }
-
-                val timings = JSONObject(response)
-                    .getJSONObject("data")
-                    .getJSONObject("timings")
-
-                val results = names.map {
-                    it.first to timings.getString(it.second).take(5)
-                }
-
-                runOnUiThread {
-                    prayerBox.removeAllViews()
-
-                    for ((name, time) in results) {
-                        prayerBox.addView(
-                            text(
-                                "$name     ${faTime(time)}",
-                                18f,
-                                green,
-                                true
-                            )
-                        )
-                    }
-
-                    status.text = "زمان‌های امروز دریافت شد"
-                    status.setTextColor(green)
-                }
-
-            } catch (e: Exception) {
-                runOnUiThread {
-                    status.text = "دریافت زمان‌ها ناموفق بود"
-                    status.setTextColor(red)
-                }
-            } finally {
-                connection?.disconnect()
-            }
+        weatherBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = shape(white, 20)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            elevation = dp(2).toFloat()
         }
 
+        weatherBox.addView(
+            text("هنوز اطلاعاتی دریافت نشده است", 14f, gray)
+        )
+        root.addView(weatherBox, params())
+
         root.addView(
-            featureCard(
-                "🔄",
-                "دریافت دوباره",
-                "به‌روزرسانی زمان‌ها",
-                gold
-            ) {
-                showPrayerTimes()
+            featureCard("🔄", "به‌روزرسانی اطلاعات", "دریافت دوباره موقعیت و اطلاعات") {
+                beginLocation()
             },
-            params()
+            params(12, 6)
         )
 
         root.addView(
-            featureCard(
-                "🏠",
-                "صفحه اصلی",
-                "بازگشت به خانه",
-                green
-            ) {
+            featureCard("🏠", "صفحه اصلی", "بازگشت به خانه") {
                 showHome()
             },
             params()
         )
 
         setContentView(scroll)
+
+        beginLocation()
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        val fine = checkSelfPermission(
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        val coarse = checkSelfPermission(
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        return fine || coarse
+    }
+
+    private fun beginLocation() {
+        if (!hasLocationPermission()) {
+            liveStatus.text = "برای ادامه، اجازه دسترسی به مکان را بدهید."
+
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                permissionCode
+            )
+            return
+        }
+
+        findPhoneLocation()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
+        )
+
+        if (requestCode == permissionCode) {
+            if (hasLocationPermission()) {
+                findPhoneLocation()
+            } else {
+                liveStatus.text =
+                    "بدون اجازه مکان‌یابی نمی‌توان اطلاعات محلی را دریافت کرد."
+            }
+        }
+    }
+
+    private fun findPhoneLocation() {
+        liveStatus.text = "در حال پیدا کردن موقعیت گوشی..."
+
+        try {
+            locationManager =
+                getSystemService(LOCATION_SERVICE) as LocationManager
+
+            val manager = locationManager!!
+
+            val providers = manager.getProviders(true)
+
+            if (providers.isEmpty()) {
+                liveStatus.text =
+                    "مکان‌یابی گوشی خاموش است. لطفاً GPS را روشن کنید."
+                return
+            }
+
+            var cachedLocation: Location? = null
+
+            for (provider in providers) {
+                val cached = try {
+                    manager.getLastKnownLocation(provider)
+                } catch (e: SecurityException) {
+                    null
+                }
+
+                if (cached != null &&
+                    (cachedLocation == null ||
+                     cached.accuracy < cachedLocation!!.accuracy)
+                ) {
+                    cachedLocation = cached
+                }
+            }
+
+            if (cachedLocation != null &&
+                System.currentTimeMillis() - cachedLocation!!.time < 10 * 60 * 1000
+            ) {
+                loadOnlineInformation(cachedLocation!!)
+                return
+            }
+
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    stopLocationUpdates()
+                    loadOnlineInformation(location)
+                }
+
+                override fun onProviderEnabled(provider: String) {}
+
+                override fun onProviderDisabled(provider: String) {}
+
+                @Deprecated("Deprecated in Android")
+                override fun onStatusChanged(
+                    provider: String?,
+                    status: Int,
+                    extras: android.os.Bundle?
+                ) {}
+            }
+
+            locationListener = listener
+
+            for (provider in providers) {
+                try {
+                    manager.requestLocationUpdates(
+                        provider,
+                        1000L,
+                        0f,
+                        listener,
+                        Looper.getMainLooper()
+                    )
+                } catch (e: SecurityException) {
+                    // Permission may have changed.
+                }
+            }
+
+            handler.postDelayed({
+                if (locationListener != null) {
+                    stopLocationUpdates()
+                    liveStatus.text =
+                        "موقعیت پیدا نشد. GPS و اینترنت را بررسی کنید."
+                }
+            }, 25000)
+
+        } catch (e: Exception) {
+            liveStatus.text = "خطا در دریافت موقعیت گوشی."
+        }
+    }
+
+    private fun stopLocationUpdates() {
+        try {
+            locationListener?.let {
+                locationManager?.removeUpdates(it)
+            }
+        } catch (e: Exception) {
+            // Ignore location cleanup errors.
+        }
+
+        locationListener = null
+    }
+
+    // دریافت هم‌زمان اوقات شرعی و هواشناسی
+    private fun loadOnlineInformation(location: Location) {
+        liveStatus.text = "موقعیت پیدا شد؛ اطلاعات آنلاین دریافت می‌شود..."
+
+        val latitude = location.latitude
+        val longitude = location.longitude
+
+        executor.execute {
+            var prayerResult = "دریافت اوقات شرعی ناموفق بود."
+            var weatherResult = "دریافت هواشناسی ناموفق بود."
+
+            try {
+                val timestamp = System.currentTimeMillis() / 1000L
+
+                val prayerUrl =
+                    "https://api.aladhan.com/v1/timings/$timestamp" +
+                    "?latitude=$latitude&longitude=$longitude&method=7"
+
+                val prayerJson = JSONObject(readUrl(prayerUrl))
+                val timings = prayerJson
+                    .getJSONObject("data")
+                    .getJSONObject("timings")
+
+                val prayerNames = listOf(
+                    "اذان صبح" to "Fajr",
+                    "طلوع آفتاب" to "Sunrise",
+                    "اذان ظهر" to "Dhuhr",
+                    "اذان عصر" to "Asr",
+                    "غروب آفتاب" to "Sunset",
+                    "اذان مغرب" to "Maghrib",
+                    "اذان عشا" to "Isha"
+                )
+
+                prayerResult = prayerNames.joinToString("\n") {
+                    "${it.first} : ${faTime(timings.getString(it.second).take(5))}"
+                }
+
+            } catch (e: Exception) {
+                prayerResult = "اوقات شرعی دریافت نشد. اینترنت را بررسی کنید."
+            }
+
+            try {
+                val weatherUrl =
+                    "https://api.open-meteo.com/v1/forecast" +
+                    "?latitude=$latitude&longitude=$longitude" +
+                    "&current=temperature_2m,relative_humidity_2m," +
+                    "apparent_temperature,precipitation,weather_code,wind_speed_10m" +
+                    "&timezone=auto"
+
+                val weatherJson = JSONObject(readUrl(weatherUrl))
+                val current = weatherJson.getJSONObject("current")
+
+                val temperature = current.getDouble("temperature_2m")
+                val feels = current.getDouble("apparent_temperature")
+                val humidity = current.getInt("relative_humidity_2m")
+                val wind = current.getDouble("wind_speed_10m")
+                val code = current.getInt("weather_code")
+
+                val description = weatherDescription(code)
+
+                weatherResult =
+                    "وضعیت: $description\n" +
+                    "دمای هوا: ${faTime(String.format(Locale.US, "%.1f", temperature))} درجه\n" +
+                    "دمای احساسی: ${faTime(String.format(Locale.US, "%.1f", feels))} درجه\n" +
+                    "رطوبت: ${fa(humidity)} درصد\n" +
+                    "سرعت باد: ${faTime(String.format(Locale.US, "%.1f", wind))} کیلومتر بر ساعت"
+
+            } catch (e: Exception) {
+                weatherResult = "هواشناسی دریافت نشد. اینترنت را بررسی کنید."
+            }
+
+            runOnUiThread {
+                prayerBox.removeAllViews()
+                weatherBox.removeAllViews()
+
+                prayerBox.addView(
+                    text(prayerResult, 16f, green)
+                )
+
+                weatherBox.addView(
+                    text(weatherResult, 16f, green)
+                )
+
+                liveStatus.text =
+                    "موقعیت: ${String.format(Locale.US, "%.3f", latitude)}, " +
+                    "${String.format(Locale.US, "%.3f", longitude)}"
+
+                liveStatus.setTextColor(green)
+            }
+        }
+    }
+
+    private fun readUrl(address: String): String {
+        val connection = URL(address).openConnection() as HttpURLConnection
+
+        try {
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+
+            if (connection.responseCode !in 200..299) {
+                throw Exception("HTTP ${connection.responseCode}")
+            }
+
+            return connection.inputStream
+                .bufferedReader()
+                .use { it.readText() }
+
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private fun weatherDescription(code: Int): String {
+        return when (code) {
+            0 -> "آسمان صاف"
+            1, 2 -> "کمی ابری"
+            3 -> "ابری"
+            45, 48 -> "مه‌آلود"
+            51, 53, 55 -> "نم‌نم باران"
+            56, 57 -> "باران یخ‌زده"
+            61, 63, 65 -> "بارانی"
+            66, 67 -> "باران یخی"
+            71, 73, 75 -> "برفی"
+            77 -> "دانه‌های برف"
+            80, 81, 82 -> "رگبار باران"
+            85, 86 -> "رگبار برف"
+            95 -> "رعد و برق"
+            96, 99 -> "رعد و برق و تگرگ"
+            else -> "وضعیت نامشخص"
+        }
     }
 
     private fun showCalendar() {
@@ -574,10 +735,7 @@ class MainActivity : Activity() {
         first.set(Calendar.DAY_OF_MONTH, 1)
 
         val offset = first.get(Calendar.DAY_OF_WEEK) % 7
-
-        val days = displayedMonth.getActualMaximum(
-            Calendar.DAY_OF_MONTH
-        )
+        val days = displayedMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
 
         repeat(offset) {
             grid.addView(text("", 14f), gridParams())
@@ -616,26 +774,7 @@ class MainActivity : Activity() {
         root.addView(grid, params())
 
         root.addView(
-            featureCard(
-                "📍",
-                "ماه جاری",
-                "بازگشت به امروز",
-                gold
-            ) {
-                displayedMonth.timeInMillis =
-                    System.currentTimeMillis()
-                showCalendar()
-            },
-            params()
-        )
-
-        root.addView(
-            featureCard(
-                "🏠",
-                "صفحه اصلی",
-                "بازگشت به خانه",
-                green
-            ) {
+            featureCard("🏠", "صفحه اصلی", "بازگشت به خانه") {
                 showHome()
             },
             params()
@@ -657,6 +796,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        stopLocationUpdates()
+        handler.removeCallbacksAndMessages(null)
         executor.shutdown()
         super.onDestroy()
     }
