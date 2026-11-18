@@ -1,6 +1,7 @@
 
 package ir.taqvimm.an
 
+import android.app.Activity
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -14,15 +15,15 @@ import android.widget.TextView
 import android.widget.Toast
 import android.icu.util.Calendar
 import android.icu.util.TimeZone
-import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
+import java.util.Date
 import java.util.concurrent.Executors
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : Activity() {
 
     private val green = Color.rgb(16, 77, 67)
     private val gold = Color.rgb(205, 155, 65)
@@ -47,8 +48,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         displayedMonth = newPersianCalendar()
         displayedMonth.timeInMillis = System.currentTimeMillis()
+
         showHome()
     }
 
@@ -61,12 +64,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun fa(number: Int): String {
         val digits = "۰۱۲۳۴۵۶۷۸۹"
+
         return number.toString().map {
-            if (it in '0'..'9') digits[it - '0'] else it
+            if (it in '0'..'9') {
+                digits[it - '0']
+            } else {
+                it
+            }
         }.joinToString("")
     }
 
-    private fun rounded(color: Int, radius: Float): GradientDrawable {
+    private fun faTime(value: String): String {
+        return value.map {
+            if (it in '0'..'9') {
+                "۰۱۲۳۴۵۶۷۸۹"[it - '0']
+            } else {
+                it
+            }
+        }.joinToString("")
+    }
+
+    private fun rounded(
+        color: Int,
+        radius: Float
+    ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = radius
@@ -106,7 +127,10 @@ class MainActivity : AppCompatActivity() {
             isFocusable = true
             setPadding(8, 14, 8, 14)
             minHeight = 58
-            setOnClickListener { action() }
+
+            setOnClickListener {
+                action()
+            }
         }
     }
 
@@ -123,6 +147,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         scroll.addView(root)
+
         return Pair(scroll, root)
     }
 
@@ -139,17 +164,21 @@ class MainActivity : AppCompatActivity() {
         val (scroll, root) = page()
 
         root.addView(label("🌙 تقویم من", 30f))
-        root.addView(label("تقویم، آب‌وهوا و سرگرمی در یک جا", 15f))
+        root.addView(
+            label("تقویم، اوقات شرعی و سرگرمی", 15f)
+        )
 
         val today = newPersianCalendar()
         today.timeInMillis = System.currentTimeMillis()
 
-        val date = "امروز، ${fa(today.get(Calendar.DAY_OF_MONTH))} " +
+        val date =
+            "امروز، ${fa(today.get(Calendar.DAY_OF_MONTH))} " +
             "${months[today.get(Calendar.MONTH)]} " +
             fa(today.get(Calendar.YEAR))
 
         val dateCard = label(date, 19f, white)
         dateCard.background = rounded(green, 22f)
+
         root.addView(dateCard, buttonParams())
 
         root.addView(
@@ -168,42 +197,64 @@ class MainActivity : AppCompatActivity() {
 
         root.addView(
             actionButton("🌤️ هواشناسی") {
-                Toast.makeText(this, "بخش هواشناسی هنوز آماده نشده است", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "بخش هواشناسی هنوز آماده نشده است",
+                    Toast.LENGTH_SHORT
+                ).show()
             },
             buttonParams()
         )
 
         root.addView(
             actionButton("🎮 بازی ۵۰۰ مرحله‌ای") {
-                Toast.makeText(this, "بازی هنوز آماده نشده است", Toast.LENGTH_SHORT).show()
+                Toast.makeText(
+                    this,
+                    "بخش بازی هنوز آماده نشده است",
+                    Toast.LENGTH_SHORT
+                ).show()
             },
             buttonParams()
         )
 
-        root.addView(label("طراحی اختصاصی • Pouyan", 13f, gold))
+        root.addView(
+            label("طراحی اختصاصی • Pouyan", 13f, gold)
+        )
+
         setContentView(scroll)
     }
 
-    // صفحه اوقات شرعی شیراز
     private fun showPrayerTimes() {
         val (scroll, root) = page()
 
-        root.addView(label("🕌 اوقات شرعی شیراز", 27f))
-        root.addView(label("استان فارس • ایران", 16f, gold))
+        root.addView(
+            label("🕌 اوقات شرعی شیراز", 27f)
+        )
+
+        root.addView(
+            label("استان فارس • ایران", 16f, gold)
+        )
 
         val dateFormat = SimpleDateFormat(
             "dd-MM-yyyy",
             Locale.US
         )
-        dateFormat.timeZone = java.util.TimeZone.getTimeZone("Asia/Tehran")
 
-        val today = dateFormat.format(java.util.Date())
+        dateFormat.timeZone =
+            java.util.TimeZone.getTimeZone("Asia/Tehran")
+
+        val today = dateFormat.format(Date())
 
         root.addView(
-            label("تاریخ امروز: $today", 15f)
+            label("تاریخ: $today", 15f)
         )
 
-        val status = label("در حال دریافت زمان اذان...", 16f, gold)
+        val status = label(
+            "در حال دریافت زمان اذان...",
+            16f,
+            gold
+        )
+
         root.addView(status, buttonParams())
 
         val prayerBox = LinearLayout(this).apply {
@@ -211,6 +262,7 @@ class MainActivity : AppCompatActivity() {
             background = rounded(white, 18f)
             setPadding(12, 12, 12, 12)
         }
+
         root.addView(prayerBox, buttonParams())
 
         root.addView(
@@ -227,28 +279,40 @@ class MainActivity : AppCompatActivity() {
             buttonParams()
         )
 
-        root.addView(label("Pouyan • Taqvim Man", 13f, gold))
+        root.addView(
+            label("Pouyan • Taqvim Man", 13f, gold)
+        )
+
         setContentView(scroll)
 
         executor.execute {
+            var connection: HttpURLConnection? = null
+
             try {
                 val url = URL(
                     "https://api.aladhan.com/v1/timings/$today" +
                     "?latitude=29.5918&longitude=52.5837&method=7"
                 )
 
-                val connection = url.openConnection() as HttpURLConnection
+                connection =
+                    url.openConnection() as HttpURLConnection
+
                 connection.requestMethod = "GET"
                 connection.connectTimeout = 15000
                 connection.readTimeout = 15000
 
-                val response = connection.inputStream.bufferedReader().use {
-                    it.readText()
+                val responseCode = connection.responseCode
+
+                if (responseCode !in 200..299) {
+                    throw Exception("HTTP error: $responseCode")
                 }
 
-                connection.disconnect()
+                val response = connection.inputStream
+                    .bufferedReader()
+                    .use { it.readText() }
 
                 val json = JSONObject(response)
+
                 val data = json.getJSONObject("data")
                 val timings = data.getJSONObject("timings")
 
@@ -263,28 +327,37 @@ class MainActivity : AppCompatActivity() {
                 )
 
                 val results = prayerNames.map { pair ->
-                    pair.first to timings.getString(pair.second).take(5)
+                    val time = timings
+                        .getString(pair.second)
+                        .take(5)
+
+                    pair.first to time
                 }
 
                 runOnUiThread {
                     prayerBox.removeAllViews()
 
                     for ((name, time) in results) {
-                        val row = label(
-                            "$name : ${faTime(time)}",
-                            19f,
-                            green
+                        prayerBox.addView(
+                            label(
+                                "$name : ${faTime(time)}",
+                                19f,
+                                green
+                            )
                         )
-                        prayerBox.addView(row)
                     }
 
-                    status.text = "زمان‌های امروز با موفقیت دریافت شد"
+                    status.text =
+                        "زمان‌های امروز با موفقیت دریافت شد"
+
                     status.setTextColor(green)
                 }
 
             } catch (e: Exception) {
                 runOnUiThread {
-                    status.text = "دریافت زمان‌ها ناموفق بود. اینترنت را بررسی کنید."
+                    status.text =
+                        "دریافت زمان‌ها ناموفق بود. اینترنت را بررسی کنید."
+
                     status.setTextColor(red)
 
                     Toast.makeText(
@@ -293,24 +366,29 @@ class MainActivity : AppCompatActivity() {
                         Toast.LENGTH_LONG
                     ).show()
                 }
+
+            } finally {
+                connection?.disconnect()
             }
         }
     }
 
-    private fun faTime(value: String): String {
-        return value.map {
-            if (it in '0'..'9') "۰۱۲۳۴۵۶۷۸۹"[it - '0'] else it
-        }.joinToString("")
-    }
-
     private fun showCalendar() {
         val (scroll, root) = page()
-        root.addView(label("📅 تقویم شمسی", 27f))
+
+        root.addView(
+            label("📅 تقویم شمسی", 27f)
+        )
 
         val year = displayedMonth.get(Calendar.YEAR)
         val month = displayedMonth.get(Calendar.MONTH)
 
-        root.addView(label("${months[month]} ${fa(year)}", 23f))
+        root.addView(
+            label(
+                "${months[month]} ${fa(year)}",
+                23f
+            )
+        )
 
         val navigation = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -330,14 +408,22 @@ class MainActivity : AppCompatActivity() {
 
         navigation.addView(
             nextButton,
-            LinearLayout.LayoutParams(0, 64, 1f).apply {
+            LinearLayout.LayoutParams(
+                0,
+                64,
+                1f
+            ).apply {
                 setMargins(4, 4, 4, 4)
             }
         )
 
         navigation.addView(
             previousButton,
-            LinearLayout.LayoutParams(0, 64, 1f).apply {
+            LinearLayout.LayoutParams(
+                0,
+                64,
+                1f
+            ).apply {
                 setMargins(4, 4, 4, 4)
             }
         )
@@ -346,7 +432,9 @@ class MainActivity : AppCompatActivity() {
 
         root.addView(
             actionButton("بازگشت به ماه جاری") {
-                displayedMonth.timeInMillis = System.currentTimeMillis()
+                displayedMonth.timeInMillis =
+                    System.currentTimeMillis()
+
                 showCalendar()
             },
             buttonParams()
@@ -361,25 +449,44 @@ class MainActivity : AppCompatActivity() {
         }
 
         for (name in weekdays) {
-            val color = if (name == "جمعه") red else green
-            grid.addView(label(name, 10f, color), gridParams())
+            val color =
+                if (name == "جمعه") red else green
+
+            grid.addView(
+                label(name, 10f, color),
+                gridParams()
+            )
         }
 
-        val firstDay = displayedMonth.clone() as Calendar
+        val firstDay =
+            displayedMonth.clone() as Calendar
+
         firstDay.set(Calendar.DAY_OF_MONTH, 1)
 
-        val offset = firstDay.get(Calendar.DAY_OF_WEEK) % 7
-        val days = displayedMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
+        val offset =
+            firstDay.get(Calendar.DAY_OF_WEEK) % 7
+
+        val days =
+            displayedMonth.getActualMaximum(
+                Calendar.DAY_OF_MONTH
+            )
 
         repeat(offset) {
-            grid.addView(label("", 14f), gridParams())
+            grid.addView(
+                label("", 14f),
+                gridParams()
+            )
         }
 
         for (day in 1..days) {
-            val date = displayedMonth.clone() as Calendar
+            val date =
+                displayedMonth.clone() as Calendar
+
             date.set(Calendar.DAY_OF_MONTH, day)
 
-            val isFriday = date.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
+            val isFriday =
+                date.get(Calendar.DAY_OF_WEEK) ==
+                Calendar.FRIDAY
 
             val isToday =
                 year == today.get(Calendar.YEAR) &&
@@ -412,8 +519,17 @@ class MainActivity : AppCompatActivity() {
             buttonParams()
         )
 
-        root.addView(label("جمعه‌ها با رنگ قرمز مشخص شده‌اند", 13f, red))
-        root.addView(label("Pouyan • Taqvim Man", 13f, gold))
+        root.addView(
+            label(
+                "جمعه‌ها با رنگ قرمز مشخص شده‌اند",
+                13f,
+                red
+            )
+        )
+
+        root.addView(
+            label("Pouyan • Taqvim Man", 13f, gold)
+        )
 
         setContentView(scroll)
     }
@@ -422,8 +538,18 @@ class MainActivity : AppCompatActivity() {
         return GridLayout.LayoutParams().apply {
             width = 0
             height = 54
-            columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+
+            columnSpec = GridLayout.spec(
+                GridLayout.UNDEFINED,
+                1f
+            )
+
             setMargins(2, 3, 2, 3)
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        executor.shutdown()
     }
 }
