@@ -1,7 +1,6 @@
 
 package ir.taqvimm.an
 
-import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -13,45 +12,31 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import android.icu.util.Calendar
 import android.icu.util.TimeZone
+import androidx.appcompat.app.AppCompatActivity
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
     private val green = Color.rgb(16, 77, 67)
-    private val darkGreen = Color.rgb(10, 58, 51)
     private val gold = Color.rgb(205, 155, 65)
     private val light = Color.rgb(245, 248, 246)
+    private val red = Color.rgb(190, 45, 45)
     private val white = Color.WHITE
 
     private lateinit var displayedMonth: Calendar
 
     private val months = arrayOf(
-        "فروردین",
-        "اردیبهشت",
-        "خرداد",
-        "تیر",
-        "مرداد",
-        "شهریور",
-        "مهر",
-        "آبان",
-        "آذر",
-        "دی",
-        "بهمن",
-        "اسفند"
+        "فروردین", "اردیبهشت", "خرداد",
+        "تیر", "مرداد", "شهریور",
+        "مهر", "آبان", "آذر",
+        "دی", "بهمن", "اسفند"
     )
 
     private val weekdays = arrayOf(
-        "شنبه",
-        "یکشنبه",
-        "دوشنبه",
-        "سه‌شنبه",
-        "چهارشنبه",
-        "پنجشنبه",
-        "جمعه"
+        "شنبه", "یکشنبه", "دوشنبه",
+        "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,20 +57,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun fa(number: Int): String {
         val digits = "۰۱۲۳۴۵۶۷۸۹"
-
-        return number.toString().map { char ->
-            if (char in '0'..'9') {
-                digits[char - '0']
-            } else {
-                char
-            }
+        return number.toString().map {
+            if (it in '0'..'9') digits[it - '0'] else it
         }.joinToString("")
     }
 
-    private fun rounded(
-        color: Int,
-        radius: Float
-    ): GradientDrawable {
+    private fun rounded(color: Int, radius: Float): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = radius
@@ -103,11 +80,8 @@ class MainActivity : AppCompatActivity() {
             setTextColor(color)
             gravity = Gravity.CENTER
             textDirection = View.TEXT_DIRECTION_RTL
-            typeface = Typeface.create(
-                "sans-serif",
-                Typeface.NORMAL
-            )
-            setPadding(10, 12, 10, 12)
+            typeface = Typeface.DEFAULT
+            setPadding(4, 8, 4, 8)
         }
     }
 
@@ -118,153 +92,76 @@ class MainActivity : AppCompatActivity() {
     ): TextView {
         return TextView(this).apply {
             text = value
-            textSize = 17f
+            textSize = 16f
             setTextColor(white)
             gravity = Gravity.CENTER
-            textDirection = View.TEXT_DIRECTION_RTL
-
-            typeface = Typeface.create(
-                "sans-serif",
-                Typeface.BOLD
-            )
-
-            background = rounded(color, 26f)
-            elevation = 5f
-
+            typeface = Typeface.DEFAULT_BOLD
+            background = rounded(color, 22f)
+            elevation = 4f
             isClickable = true
             isFocusable = true
-
-            setPadding(14, 16, 14, 16)
-            minHeight = 64
-
-            setOnClickListener {
-                action()
-            }
+            setPadding(8, 14, 8, 14)
+            minHeight = 58
+            setOnClickListener { action() }
         }
     }
 
     private fun page(): Pair<ScrollView, LinearLayout> {
-
         val scroll = ScrollView(this)
-
         scroll.setBackgroundColor(light)
         scroll.isFillViewport = true
 
-        val root = LinearLayout(this)
-
-        root.orientation = LinearLayout.VERTICAL
-        root.gravity = Gravity.CENTER_HORIZONTAL
-
-        root.layoutDirection =
-            View.LAYOUT_DIRECTION_RTL
-
-        root.setPadding(
-            20,
-            24,
-            20,
-            30
-        )
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(16, 20, 16, 24)
+        }
 
         scroll.addView(root)
-
         return Pair(scroll, root)
     }
 
     private fun buttonParams(): LinearLayout.LayoutParams {
-
         return LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-
-            setMargins(
-                0,
-                7,
-                0,
-                7
-            )
+            setMargins(0, 6, 0, 6)
         }
     }
 
-    private fun addGap(
-        root: LinearLayout,
-        height: Int
-    ) {
-
-        root.addView(
-            View(this),
-            LinearLayout.LayoutParams(
-                1,
-                height
-            )
-        )
-    }
-
     private fun showHome() {
-
         val (scroll, root) = page()
 
+        root.addView(label("🌙 تقویم من", 30f))
         root.addView(
-            label(
-                "🌙 تقویم من",
-                31f,
-                green
-            )
+            label("تقویم، آب‌وهوا و سرگرمی در یک جا", 15f)
         )
-
-        root.addView(
-            label(
-                "تقویم، آب‌وهوا و سرگرمی در یک جا",
-                15f,
-                darkGreen
-            )
-        )
-
-        addGap(root, 12)
 
         val today = newPersianCalendar()
+        today.timeInMillis = System.currentTimeMillis()
 
-        today.timeInMillis =
-            System.currentTimeMillis()
-
-        val dateText =
-            "امروز، ${fa(today.get(Calendar.DAY_OF_MONTH))} " +
+        val date = "امروز، ${fa(today.get(Calendar.DAY_OF_MONTH))} " +
             "${months[today.get(Calendar.MONTH)]} " +
-            "${fa(today.get(Calendar.YEAR))}"
+            fa(today.get(Calendar.YEAR))
 
-        val dateCard =
-            label(
-                dateText,
-                19f,
-                white
-            )
-
-        dateCard.background =
-            rounded(green, 24f)
+        val dateCard = label(date, 19f, white)
+        dateCard.background = rounded(green, 22f)
+        root.addView(dateCard, buttonParams())
 
         root.addView(
-            dateCard,
-            buttonParams()
-        )
-
-        addGap(root, 10)
-
-        root.addView(
-            actionButton(
-                "📅   تقویم شمسی"
-            ) {
+            actionButton("📅 تقویم شمسی") {
                 showCalendar()
             },
             buttonParams()
         )
 
         root.addView(
-            actionButton(
-                "🕌   اوقات شرعی و اذان"
-            ) {
+            actionButton("🕌 اوقات شرعی و اذان") {
                 Toast.makeText(
                     this,
-                    "بخش اوقات شرعی در مرحله بعد تکمیل می‌شود",
+                    "بخش اوقات شرعی هنوز آماده نشده است",
                     Toast.LENGTH_SHORT
                 ).show()
             },
@@ -272,12 +169,10 @@ class MainActivity : AppCompatActivity() {
         )
 
         root.addView(
-            actionButton(
-                "🌤️   هواشناسی"
-            ) {
+            actionButton("🌤️ هواشناسی") {
                 Toast.makeText(
                     this,
-                    "بخش هواشناسی در مرحله بعد تکمیل می‌شود",
+                    "بخش هواشناسی هنوز آماده نشده است",
                     Toast.LENGTH_SHORT
                 ).show()
             },
@@ -285,358 +180,147 @@ class MainActivity : AppCompatActivity() {
         )
 
         root.addView(
-            actionButton(
-                "🎮   بازی ۵۰۰ مرحله‌ای"
-            ) {
+            actionButton("🎮 بازی ۵۰۰ مرحله‌ای") {
                 Toast.makeText(
                     this,
-                    "بازی در مرحله بعد تکمیل می‌شود",
+                    "بازی هنوز آماده نشده است",
                     Toast.LENGTH_SHORT
                 ).show()
             },
             buttonParams()
         )
 
-        addGap(root, 12)
-
-        root.addView(
-            actionButton(
-                "▶️   شروع پخش اذان"
-            ) {
-
-                val intent =
-                    Intent(
-                        this,
-                        AdhanService::class.java
-                    ).setAction(
-                        AdhanService.ACTION_START
-                    )
-
-                ContextCompat.startForegroundService(
-                    this,
-                    intent
-                )
-            },
-            buttonParams()
-        )
-
-        root.addView(
-            actionButton(
-                "⏹   توقف اذان"
-            ) {
-
-                val intent =
-                    Intent(
-                        this,
-                        AdhanService::class.java
-                    ).setAction(
-                        AdhanService.ACTION_STOP
-                    )
-
-                startService(intent)
-            },
-            buttonParams()
-        )
-
-        addGap(root, 15)
-
-        root.addView(
-            label(
-                "طراحی اختصاصی • Pouyan",
-                13f,
-                gold
-            )
-        )
-
+        root.addView(label("طراحی اختصاصی • Pouyan", 13f, gold))
         setContentView(scroll)
     }
 
     private fun showCalendar() {
-
         val (scroll, root) = page()
 
-        root.addView(
-            label(
-                "📅 تقویم شمسی",
-                28f,
-                green
-            )
-        )
+        root.addView(label("📅 تقویم شمسی", 27f))
 
-        val today =
-            newPersianCalendar()
-
-        today.timeInMillis =
-            System.currentTimeMillis()
-
-        val todayText =
-            "امروز: ${fa(today.get(Calendar.DAY_OF_MONTH))} " +
-            "${months[today.get(Calendar.MONTH)]} " +
-            "${fa(today.get(Calendar.YEAR))}"
-
-        val todayCard =
-            label(
-                todayText,
-                18f,
-                white
-            )
-
-        todayCard.background =
-            rounded(green, 22f)
+        val year = displayedMonth.get(Calendar.YEAR)
+        val month = displayedMonth.get(Calendar.MONTH)
 
         root.addView(
-            todayCard,
-            buttonParams()
+            label("${months[month]} ${fa(year)}", 23f)
         )
 
-        addGap(root, 10)
+        // دکمه‌های ماه قبل و بعد با عرض مساوی
+        val navigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
 
-        val navigation =
-            LinearLayout(this)
+        val nextButton = actionButton("ماه بعد ←", gold) {
+            displayedMonth.add(Calendar.MONTH, 1)
+            showCalendar()
+        }
 
-        navigation.orientation =
-            LinearLayout.HORIZONTAL
-
-        navigation.gravity =
-            Gravity.CENTER
-
-        navigation.layoutDirection =
-            View.LAYOUT_DIRECTION_RTL
-
-        val nextButton =
-            actionButton(
-                "→ ماه بعد",
-                gold
-            ) {
-
-                displayedMonth.add(
-                    Calendar.MONTH,
-                    1
-                )
-
-                showCalendar()
-            }
-
-        val previousButton =
-            actionButton(
-                "ماه قبل ←",
-                gold
-            ) {
-
-                displayedMonth.add(
-                    Calendar.MONTH,
-                    -1
-                )
-
-                showCalendar()
-            }
+        val previousButton = actionButton("→ ماه قبل", gold) {
+            displayedMonth.add(Calendar.MONTH, -1)
+            showCalendar()
+        }
 
         navigation.addView(
             nextButton,
-            LinearLayout.LayoutParams(
-                0,
-                58,
-                1f
-            ).apply {
-                setMargins(
-                    4,
-                    4,
-                    4,
-                    4
-                )
+            LinearLayout.LayoutParams(0, 64, 1f).apply {
+                setMargins(4, 4, 4, 4)
             }
         )
 
         navigation.addView(
             previousButton,
-            LinearLayout.LayoutParams(
-                0,
-                58,
-                1f
-            ).apply {
-                setMargins(
-                    4,
-                    4,
-                    4,
-                    4
-                )
+            LinearLayout.LayoutParams(0, 64, 1f).apply {
+                setMargins(4, 4, 4, 4)
             }
         )
 
-        root.addView(navigation)
+        root.addView(navigation, buttonParams())
 
         root.addView(
-            actionButton(
-                "🔄   بازگشت به ماه جاری"
-            ) {
-
-                displayedMonth.timeInMillis =
-                    System.currentTimeMillis()
-
+            actionButton("بازگشت به ماه جاری") {
+                displayedMonth.timeInMillis = System.currentTimeMillis()
                 showCalendar()
             },
             buttonParams()
         )
 
-        val year =
-            displayedMonth.get(
-                Calendar.YEAR
-            )
+        val today = newPersianCalendar()
+        today.timeInMillis = System.currentTimeMillis()
 
-        val month =
-            displayedMonth.get(
-                Calendar.MONTH
-            )
+        val grid = GridLayout(this).apply {
+            columnCount = 7
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        }
 
-        root.addView(
-            label(
-                "${months[month]} ${fa(year)}",
-                25f,
-                green
-            )
-        )
-
-        addGap(root, 8)
-
-        val grid =
-            GridLayout(this)
-
-        grid.columnCount = 7
-
-        grid.layoutDirection =
-            View.LAYOUT_DIRECTION_RTL
-
-        for (dayName in weekdays) {
-
-            val cell =
-                label(
-                    dayName,
-                    11f,
-                    green
-                )
-
-            cell.setPadding(
-                2,
-                8,
-                2,
-                8
-            )
-
+        for (name in weekdays) {
+            val color = if (name == "جمعه") red else green
             grid.addView(
-                cell,
+                label(name, 10f, color),
                 gridParams()
             )
         }
 
-        val firstDay =
-            displayedMonth.clone()
-                    as Calendar
+        val firstDay = displayedMonth.clone() as Calendar
+        firstDay.set(Calendar.DAY_OF_MONTH, 1)
 
-        firstDay.set(
-            Calendar.DAY_OF_MONTH,
-            1
-        )
+        val offset = firstDay.get(Calendar.DAY_OF_WEEK) % 7
+        val days = displayedMonth.getActualMaximum(Calendar.DAY_OF_MONTH)
 
-        val offset =
-            firstDay.get(
-                Calendar.DAY_OF_WEEK
-            ) % 7
-
-        val daysInMonth =
-            displayedMonth.getActualMaximum(
-                Calendar.DAY_OF_MONTH
-            )
-
-        for (i in 0 until offset) {
-
-            grid.addView(
-                label(
-                    "",
-                    14f
-                ),
-                gridParams()
-            )
+        repeat(offset) {
+            grid.addView(label("", 14f), gridParams())
         }
 
-        for (day in 1..daysInMonth) {
+        for (day in 1..days) {
+            val date = displayedMonth.clone() as Calendar
+            date.set(Calendar.DAY_OF_MONTH, day)
+
+            val isFriday = date.get(Calendar.DAY_OF_WEEK) == Calendar.FRIDAY
 
             val isToday =
-                year ==
-                    today.get(Calendar.YEAR) &&
-                month ==
-                    today.get(Calendar.MONTH) &&
-                day ==
-                    today.get(Calendar.DAY_OF_MONTH)
+                year == today.get(Calendar.YEAR) &&
+                month == today.get(Calendar.MONTH) &&
+                day == today.get(Calendar.DAY_OF_MONTH)
 
-            val cell =
-                label(
-                    fa(day),
-                    16f,
-                    if (isToday) {
-                        white
-                    } else {
-                        green
-                    }
-                )
+            val cell = label(
+                fa(day),
+                16f,
+                when {
+                    isToday -> white
+                    isFriday -> red
+                    else -> green
+                }
+            )
 
             if (isToday) {
-                cell.background =
-                    rounded(
-                        green,
-                        18f
-                    )
+                cell.background = rounded(green, 16f)
             }
 
-            grid.addView(
-                cell,
-                gridParams()
-            )
+            grid.addView(cell, gridParams())
         }
 
         root.addView(grid)
-
-        addGap(root, 15)
-
         root.addView(
-            actionButton(
-                "🏠   بازگشت به صفحه اصلی"
-            ) {
+            actionButton("🏠 بازگشت به صفحه اصلی") {
                 showHome()
             },
             buttonParams()
         )
 
-        root.addView(
-            label(
-                "Pouyan • Taqvim Man",
-                13f,
-                gold
-            )
-        )
+        root.addView(label("جمعه‌ها با رنگ قرمز مشخص شده‌اند", 13f, red))
+        root.addView(label("Pouyan • Taqvim Man", 13f, gold))
 
         setContentView(scroll)
     }
 
-    private fun gridParams():
-            GridLayout.LayoutParams {
-
+    private fun gridParams(): GridLayout.LayoutParams {
         return GridLayout.LayoutParams().apply {
-
             width = 0
             height = 54
-
-            columnSpec =
-                GridLayout.spec(
-                    GridLayout.UNDEFINED,
-                    1f
-                )
-
-            setMargins(
-                2,
-                3,
-                2,
-                3
-            )
+            columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            setMargins(2, 3, 2, 3)
         }
     }
 }
