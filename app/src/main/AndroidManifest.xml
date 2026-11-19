@@ -1,11 +1,7 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- مجوز اینترنت -->
     <uses-permission android:name="android.permission.INTERNET" />
-
-    <!-- مجوز مکان -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
@@ -27,5 +23,4 @@
         </activity>
 
     </application>
-
 </manifest>
