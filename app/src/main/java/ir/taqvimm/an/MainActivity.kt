@@ -1212,71 +1212,70 @@ class MainActivity : Activity() {
 
     // تبدیل تاریخ میلادی به تاریخ شمسی
 
-    private fun persianCalendar(
-        calendar: Calendar
-    ): android.icu.util.PersianCalendar {
+    
+// تبدیل تاریخ میلادی به تقویم شمسی
+private fun persianCalendar(
+    calendar: Calendar
+): android.icu.util.Calendar {
+    val persian = android.icu.util.Calendar.getInstance(
+        Locale.forLanguageTag("fa-IR-u-ca-persian")
+    )
+    persian.timeInMillis = calendar.timeInMillis
+    return persian
+}
 
-        return android.icu.util.PersianCalendar().apply {
-            timeInMillis = calendar.timeInMillis
-        }
-    }
+private fun toJalali(
+    year: Int,
+    month: Int,
+    day: Int
+): IntArray {
+    val calendar = Calendar.getInstance()
 
-    private fun toJalali(
-        year: Int,
-        month: Int,
-        day: Int
-    ): IntArray {
+    calendar.set(
+        year,
+        month - 1,
+        day,
+        12,
+        0,
+        0
+    )
 
-        val calendar = Calendar.getInstance()
+    val p = persianCalendar(calendar)
 
-        calendar.set(
-            year,
-            month - 1,
-            day,
-            12,
-            0,
-            0
-        )
+    return intArrayOf(
+        p.get(android.icu.util.Calendar.YEAR),
+        p.get(android.icu.util.Calendar.MONTH) + 1,
+        p.get(android.icu.util.Calendar.DAY_OF_MONTH)
+    )
+}
 
-        val p = persianCalendar(calendar)
 
-        return intArrayOf(
-            p.get(android.icu.util.Calendar.YEAR),
-            p.get(android.icu.util.Calendar.MONTH) + 1,
-            p.get(android.icu.util.Calendar.DAY_OF_MONTH)
-        )
-    }
+private fun toGregorian(
+    year: Int,
+    month: Int,
+    day: Int
+): IntArray {
+    val p = android.icu.util.Calendar.getInstance(
+        Locale.forLanguageTag("fa-IR-u-ca-persian")
+    )
 
-    private fun toGregorian(
-        year: Int,
-        month: Int,
-        day: Int
-    ): IntArray {
+    p.clear()
+    p.set(android.icu.util.Calendar.YEAR, year)
+    p.set(android.icu.util.Calendar.MONTH, month - 1)
+    p.set(android.icu.util.Calendar.DAY_OF_MONTH, day)
 
-        val p = android.icu.util.PersianCalendar()
+    val g = Calendar.getInstance()
+    g.timeInMillis = p.timeInMillis
 
-        p.set(
-            android.icu.util.Calendar.YEAR,
-            year
-        )
+    return intArrayOf(
+        g.get(Calendar.YEAR),
+        g.get(Calendar.MONTH) + 1,
+        g.get(Calendar.DAY_OF_MONTH)
+    )
+}
 
-        p.set(
-            android.icu.util.Calendar.MONTH,
-            month - 1
-        )
 
-        p.set(
-            android.icu.util.Calendar.DAY_OF_MONTH,
-            day
-        )
-
-        val g = Calendar.getInstance()
-
-        g.timeInMillis = p.timeInMillis
-
-        return intArrayOf(
-            g.get(Calendar.YEAR),
-            g.get(Calendar.MONTH) + 1,
+        
             g.get(Calendar.DAY_OF_MONTH)
         )
     }
