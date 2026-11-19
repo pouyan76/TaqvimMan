@@ -40,6 +40,7 @@ class MainActivity : Activity() {
     private val gold = Color.rgb(226, 184, 91)
     private val black = Color.rgb(14, 20, 19)
     private val cardColor = Color.rgb(25, 39, 35)
+    private val softCard = Color.rgb(31, 49, 43)
     private val white = Color.WHITE
     private val muted = Color.rgb(190, 202, 196)
 
@@ -48,30 +49,30 @@ class MainActivity : Activity() {
 
     private lateinit var root: LinearLayout
     private var currentPage = 0
-
     private var displayedMonth = Calendar.getInstance()
 
     private var latitude = 35.6892
     private var longitude = 51.3890
-
     private var locationLabel = "تهران (مکان پیش‌فرض)"
 
     private var locationManager: LocationManager? = null
     private var locationListener: LocationListener? = null
-
     private var weatherJson: JSONObject? = null
     private var prayerJson: JSONObject? = null
 
     private val pageTitles = listOf(
         "خانه",
         "تقویم",
-        "اوقات شرعی",
+        "اوقات",
         "هواشناسی",
-        "بازی‌ها"
+        "بازی"
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        window.statusBarColor = darkGreen
+        window.navigationBarColor = black
 
         locationManager =
             getSystemService(LOCATION_SERVICE) as LocationManager
@@ -95,51 +96,54 @@ class MainActivity : Activity() {
 
     private fun rounded(
         color: Int,
-        radius: Int = 18
+        radius: Int = 18,
+        stroke: Int = 0
     ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
+
+            if (stroke != 0) {
+                setStroke(dp(1), stroke)
+            }
         }
     }
 
-    private fun text(
+    private fun label(
         value: String,
-        size: Float = 15f,
+        size: Float = 14f,
         color: Int = white,
-        bold: Boolean = false
+        bold: Boolean = false,
+        gravityValue: Int = Gravity.CENTER
     ): TextView {
-
         return TextView(this).apply {
             text = value
             textSize = size
             setTextColor(color)
-            gravity = Gravity.CENTER
+            gravity = gravityValue
 
             if (bold) {
                 setTypeface(typeface, Typeface.BOLD)
             }
 
-            setPadding(
-                dp(6),
-                dp(7),
-                dp(6),
-                dp(7)
-            )
+            setLineSpacing(dp(2).toFloat(), 1f)
+            setPadding(dp(5), dp(5), dp(5), dp(5))
         }
     }
 
-    private fun button(
+    private fun actionButton(
         value: String,
         onClick: () -> Unit
     ): Button {
-
         return Button(this).apply {
             text = value
             textSize = 13f
             setTextColor(white)
             isAllCaps = false
+            stateListAnimator = null
             background = rounded(emerald, 14)
+
+            setPadding(dp(10), 0, dp(10), 0)
 
             setOnClickListener {
                 onClick()
@@ -148,50 +152,54 @@ class MainActivity : Activity() {
     }
 
     private fun buildShell() {
-
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(black)
         }
 
         val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(
-                dp(12),
-                dp(12),
-                dp(12),
-                dp(10)
-            )
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(12), dp(18), dp(12))
             background = rounded(darkGreen, 0)
         }
 
-        header.addView(
-            text("تقویم من", 23f, gold, true)
+        val brand = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        brand.addView(
+            label("تقویم من", 22f, gold, true, Gravity.START)
         )
 
-        header.addView(
-            text(
-                "تقویم هوشمند • زمان • آب‌وهوا",
-                11f,
-                muted
+        brand.addView(
+            label(
+                "همراه هوشمند روزهای شما",
+                10.5f,
+                muted,
+                false,
+                Gravity.START
             )
         )
 
+        header.addView(
+            brand,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        header.addView(
+            label("✦", 25f, gold, true)
+        )
+
         val content = FrameLayout(this).apply {
-            id = View.generateViewId()
             tag = "page_container"
         }
 
         val nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            setPadding(
-                dp(4),
-                dp(7),
-                dp(4),
-                dp(7)
-            )
+            setPadding(dp(5), dp(5), dp(5), dp(5))
             background = rounded(darkGreen, 0)
         }
 
@@ -202,14 +210,10 @@ class MainActivity : Activity() {
                 textSize = 10.5f
                 gravity = Gravity.CENTER
 
-                setTextColor(
-                    if (index == 0) gold else muted
-                )
-
                 setPadding(
-                    dp(3),
+                    dp(2),
                     dp(10),
-                    dp(3),
+                    dp(2),
                     dp(10)
                 )
 
@@ -220,28 +224,27 @@ class MainActivity : Activity() {
 
             nav.addView(
                 item,
-                LinearLayout.LayoutParams(
-                    0,
-                    dp(48),
-                    1f
-                )
+                LinearLayout.LayoutParams(0, dp(48), 1f)
             )
         }
 
-        root.addView(header)
+        root.addView(
+            header,
+            LinearLayout.LayoutParams(-1, dp(66))
+        )
 
         root.addView(
             content,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
+            LinearLayout.LayoutParams(-1, 0, 1f)
         )
 
-        root.addView(nav)
+        root.addView(
+            nav,
+            LinearLayout.LayoutParams(-1, dp(60))
+        )
 
         setContentView(root)
+        updateNavigationColors()
     }
 
     private fun pageContainer(): FrameLayout {
@@ -255,23 +258,19 @@ class MainActivity : Activity() {
 
             setPadding(
                 dp(16),
-                dp(18),
+                dp(17),
                 dp(16),
                 dp(24)
             )
         }
 
         val scroll = ScrollView(this).apply {
-
             isFillViewport = true
             isVerticalScrollBarEnabled = false
 
             addView(
                 body,
-                FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT
-                )
+                ScrollView.LayoutParams(-1, -2)
             )
         }
 
@@ -286,10 +285,7 @@ class MainActivity : Activity() {
 
         pageContainer().addView(
             pair.first,
-            FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
+            FrameLayout.LayoutParams(-1, -1)
         )
 
         return pair
@@ -312,8 +308,11 @@ class MainActivity : Activity() {
 
     private fun updateNavigationColors() {
 
-        val nav = root.getChildAt(2) as? LinearLayout
-            ?: return
+        if (!::root.isInitialized || root.childCount < 3) {
+            return
+        }
+
+        val nav = root.getChildAt(2) as? LinearLayout ?: return
 
         for (i in 0 until nav.childCount) {
 
@@ -322,30 +321,35 @@ class MainActivity : Activity() {
             item.setTextColor(
                 if (i == currentPage) gold else muted
             )
+
+            item.setTypeface(
+                null,
+                if (i == currentPage) Typeface.BOLD
+                else Typeface.NORMAL
+            )
         }
     }
 
-    private fun addTitle(
+    private fun addHeading(
         body: LinearLayout,
         title: String,
         subtitle: String = ""
     ) {
 
         body.addView(
-            text(title, 21f, gold, true)
+            label(title, 21f, gold, true, Gravity.START)
         )
 
         if (subtitle.isNotBlank()) {
             body.addView(
-                text(subtitle, 12f, muted)
+                label(subtitle, 11.5f, muted, false, Gravity.START)
             )
         }
 
-        body.addView(space(8))
+        body.addView(space(12))
     }
 
     private fun space(height: Int): View {
-
         return View(this).apply {
             layoutParams = LinearLayout.LayoutParams(
                 1,
@@ -357,94 +361,290 @@ class MainActivity : Activity() {
     private fun addCard(
         body: LinearLayout,
         title: String,
-        content: String
+        content: String,
+        accent: Boolean = false
     ) {
 
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            background = rounded(cardColor)
+
+            background = rounded(
+                if (accent) darkGreen else cardColor,
+                18,
+                if (accent) gold else 0
+            )
 
             setPadding(
+                dp(14),
                 dp(12),
-                dp(10),
-                dp(12),
-                dp(10)
+                dp(14),
+                dp(12)
             )
         }
 
         card.addView(
-            text(title, 15f, gold, true)
+            label(title, 13f, gold, true, Gravity.START)
         )
 
         card.addView(
-            text(content, 14f, white)
+            label(content, 14f, white, false, Gravity.START)
         )
 
         body.addView(
             card,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
+            LinearLayout.LayoutParams(-1, -2).apply {
                 bottomMargin = dp(10)
             }
         )
     }
-        private fun showHome() {
 
-        val (_, body) = newPage()
+    private fun addSectionTitle(
+        body: LinearLayout,
+        title: String
+    ) {
 
-        addTitle(
-            body,
-            "داشبورد امروز",
-            "نمای کلی روز شما"
+        body.addView(
+            label(title, 16f, gold, true, Gravity.START)
         )
+
+        body.addView(space(5))
+    }
+        private fun showHome() {
+        val (_, body) = newPage()
 
         val today = Calendar.getInstance()
 
-        addCard(
-            body,
-            jalaliDate(today),
-            weekday(today)
+        val j = toJalali(
+            today.get(Calendar.YEAR),
+            today.get(Calendar.MONTH) + 1,
+            today.get(Calendar.DAY_OF_MONTH)
         )
 
-        addCard(
-            body,
-            "موقعیت فعلی",
-            locationLabel
+        val monthName = jalaliMonthName(j[1])
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            background = rounded(darkGreen, 24, gold)
+            setPadding(dp(16), dp(18), dp(16), dp(18))
+        }
+
+        hero.addView(
+            label("امروز • ${weekday(today)}", 13f, muted, true)
         )
 
-        addCard(
-            body,
-            "اوقات شرعی",
-            if (prayerJson == null) {
-                "برای دریافت اطلاعات، مکان‌یابی و اتصال اینترنت را بررسی کنید."
-            } else {
-                prayerSummary()
+        hero.addView(
+            label(j[2].toString(), 48f, gold, true)
+        )
+
+        hero.addView(
+            label("$monthName ${j[0]}", 19f, white, true)
+        )
+
+        hero.addView(
+            label(gregorianDate(today), 11f, muted)
+        )
+
+        body.addView(
+            hero,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(14)
             }
         )
 
-        addCard(
-            body,
-            "هواشناسی",
-            if (weatherJson == null) {
-                "در حال دریافت اطلاعات آب‌وهوا..."
-            } else {
-                weatherSummary()
+        val locationCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(cardColor, 15)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+        }
+
+        locationCard.addView(
+            label("⌖", 22f, gold, true)
+        )
+
+        locationCard.addView(
+            label(locationLabel, 11.5f, white, false, Gravity.START),
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        locationCard.addView(
+            label("مکان", 10f, muted)
+        )
+
+        body.addView(
+            locationCard,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(14)
+            }
+        )
+
+        addSectionTitle(body, "اوقات شرعی امروز")
+
+        val timings = prayerJson
+            ?.optJSONObject("data")
+            ?.optJSONObject("timings")
+
+        val prayerItems = listOf(
+            "صبح" to "Fajr",
+            "طلوع" to "Sunrise",
+            "ظهر" to "Dhuhr",
+            "عصر" to "Asr",
+            "مغرب" to "Maghrib"
+        )
+
+        val prayerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        prayerItems.forEach { (name, key) ->
+
+            val value = timings
+                ?.optString(key, "--")
+                ?.substringBefore(" ") ?: "--"
+
+            val tile = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                background = rounded(cardColor, 13)
+
+                setPadding(
+                    dp(3),
+                    dp(9),
+                    dp(3),
+                    dp(9)
+                )
+
+                addView(
+                    label(name, 10f, muted)
+                )
+
+                addView(
+                    label(value, 12f, gold, true)
+                )
+            }
+
+            prayerRow.addView(
+                tile,
+                LinearLayout.LayoutParams(0, dp(68), 1f).apply {
+                    marginEnd = dp(4)
+                }
+            )
+        }
+
+        body.addView(
+            prayerRow,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(14)
+            }
+        )
+
+        if (timings == null) {
+
+            body.addView(
+                label(
+                    "برای دریافت زمان‌های دقیق، اینترنت و دسترسی مکان را بررسی کنید.",
+                    11f,
+                    muted,
+                    false,
+                    Gravity.START
+                )
+            )
+
+            body.addView(space(8))
+        }
+
+        addSectionTitle(body, "آب‌وهوای فعلی")
+
+        val current = weatherJson?.optJSONObject("current")
+
+        val temperature = current
+            ?.optDouble("temperature_2m", Double.NaN)
+            ?: Double.NaN
+
+        val humidity = current
+            ?.optInt("relative_humidity_2m", -1)
+            ?: -1
+
+        val condition = weatherDescription(
+            current?.optInt("weather_code", -1) ?: -1
+        )
+
+        val weatherHero = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(cardColor, 18)
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+        }
+
+        weatherHero.addView(
+            label(
+                if (temperature.isNaN()) "☁" else "☀",
+                34f,
+                gold,
+                true
+            )
+        )
+
+        val weatherInfo = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        weatherInfo.addView(
+            label(
+                if (temperature.isNaN()) {
+                    "در انتظار دریافت اطلاعات"
+                } else {
+                    "${temperature.roundToInt()}°C"
+                },
+                25f,
+                white,
+                true,
+                Gravity.START
+            )
+        )
+
+        weatherInfo.addView(
+            label(
+                if (temperature.isNaN()) {
+                    "اتصال اینترنت را بررسی کنید"
+                } else {
+                    "$condition  •  رطوبت ${if (humidity >= 0) "$humidity٪" else "--"}"
+                },
+                11f,
+                muted,
+                false,
+                Gravity.START
+            )
+        )
+
+        weatherHero.addView(
+            weatherInfo,
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        weatherHero.addView(
+            label("۷ روز", 11f, gold, true)
+        )
+
+        body.addView(
+            weatherHero,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(14)
             }
         )
 
         body.addView(
-            button("به‌روزرسانی اطلاعات آنلاین") {
+            actionButton("به‌روزرسانی اطلاعات آنلاین") {
                 loadOnlineInformation()
             },
-            LinearLayout.LayoutParams(-1, dp(52))
+            LinearLayout.LayoutParams(-1, dp(50))
         )
 
-        body.addView(space(12))
+        body.addView(space(8))
 
         body.addView(
-            button("رفتن به تقویم") {
+            actionButton("مشاهده تقویم شمسی") {
                 navigateTo(1)
             },
             LinearLayout.LayoutParams(-1, dp(48))
@@ -457,10 +657,10 @@ class MainActivity : Activity() {
 
         val (_, body) = newPage()
 
-        addTitle(
+        addHeading(
             body,
             "تقویم شمسی",
-            "ماه را با دکمه‌های زیر تغییر دهید"
+            "ماه موردنظر را انتخاب کنید"
         )
 
         val header = LinearLayout(this).apply {
@@ -469,35 +669,35 @@ class MainActivity : Activity() {
         }
 
         header.addView(
-            button("ماه قبل") {
+            actionButton("ماه قبل") {
                 changeMonth(-1)
             },
-            LinearLayout.LayoutParams(0, dp(46), 1f)
+            LinearLayout.LayoutParams(0, dp(44), 1f)
         )
 
         header.addView(
-            text(
+            label(
                 jalaliMonthTitle(displayedMonth),
-                17f,
+                16f,
                 gold,
                 true
             ),
-            LinearLayout.LayoutParams(0, dp(46), 2f)
+            LinearLayout.LayoutParams(0, dp(44), 2f)
         )
 
         header.addView(
-            button("ماه بعد") {
+            actionButton("ماه بعد") {
                 changeMonth(1)
             },
-            LinearLayout.LayoutParams(0, dp(46), 1f)
+            LinearLayout.LayoutParams(0, dp(44), 1f)
         )
 
         body.addView(header)
-        body.addView(space(10))
+        body.addView(space(12))
 
         val grid = GridLayout(this).apply {
             columnCount = 7
-            background = rounded(cardColor)
+            background = rounded(cardColor, 17)
 
             setPadding(
                 dp(5),
@@ -507,73 +707,84 @@ class MainActivity : Activity() {
             )
         }
 
-        val names = listOf(
-            "ش", "ی", "د", "س", "چ", "پ", "ج"
-        )
-
-        names.forEach {
-            grid.addView(gridCell(it, true))
+        listOf("ش", "ی", "د", "س", "چ", "پ", "ج").forEach {
+            grid.addView(
+                gridCell(it, true, false)
+            )
         }
 
         val first = firstDayOfJalaliMonth(displayedMonth)
         val count = jalaliMonthLength(displayedMonth)
 
-        val offset =
-            (first.get(Calendar.DAY_OF_WEEK) + 5) % 7
+        val offset = (first.get(Calendar.DAY_OF_WEEK) + 5) % 7
 
         repeat(offset) {
-            grid.addView(gridCell("", false))
+            grid.addView(
+                gridCell("", false, false)
+            )
         }
+
+        val today = Calendar.getInstance()
+
+        val todayJ = toJalali(
+            today.get(Calendar.YEAR),
+            today.get(Calendar.MONTH) + 1,
+            today.get(Calendar.DAY_OF_MONTH)
+        )
+
+        val monthJ = toJalali(
+            displayedMonth.get(Calendar.YEAR),
+            displayedMonth.get(Calendar.MONTH) + 1,
+            1
+        )
 
         for (day in 1..count) {
 
-            val cell = gridCell(day.toString(), false)
+            val isToday =
+                todayJ[0] == monthJ[0] &&
+                todayJ[1] == monthJ[1] &&
+                todayJ[2] == day
 
-            val today = Calendar.getInstance()
-
-            if (
-                jalaliDate(today) ==
-                jalaliDate(first).substringBefore(" ") + " $day"
-            ) {
-                cell.setTextColor(gold)
-                cell.setTypeface(
-                    cell.typeface,
-                    Typeface.BOLD
-                )
-            }
-
-            grid.addView(cell)
+            grid.addView(
+                gridCell(day.toString(), false, isToday)
+            )
         }
 
-        body.addView(grid)
+        body.addView(
+            grid,
+            LinearLayout.LayoutParams(-1, -2)
+        )
+
         body.addView(space(12))
 
         addCard(
             body,
-            "راهنما",
-            "روز جاری با رنگ طلایی مشخص می‌شود. برای جابه‌جایی بین ماه‌ها از دکمه‌های بالا استفاده کنید."
+            "راهنمای تقویم",
+            "روز جاری با رنگ طلایی مشخص شده است. برای رفتن به ماه‌های قبل و بعد از دکمه‌های بالا استفاده کنید."
         )
     }
 
     private fun gridCell(
         value: String,
-        header: Boolean
+        header: Boolean,
+        selected: Boolean
     ): TextView {
 
-        return text(
+        return label(
             value,
-            if (header) 12f else 14f,
-            if (header) gold else white,
-            header
+            if (header) 11f else 13f,
+            when {
+                selected -> black
+                header -> gold
+                else -> white
+            },
+            header || selected
         ).apply {
 
-            background = if (header) {
-                rounded(darkGreen, 8)
-            } else {
-                rounded(
-                    Color.rgb(35, 53, 47),
-                    8
-                )
+            background = when {
+                selected -> rounded(gold, 9)
+                header -> rounded(darkGreen, 8)
+                else -> rounded(softCard, 8)
             }
 
             layoutParams = GridLayout.LayoutParams().apply {
@@ -617,40 +828,39 @@ class MainActivity : Activity() {
             greg[2]
         )
 
+        displayedMonth.set(
+            Calendar.HOUR_OF_DAY,
+            12
+        )
+
         showCalendar()
     }
-
-    private fun showPrayer() {
-
+        private fun showPrayer() {
         val (_, body) = newPage()
 
-        addTitle(
+        addHeading(
             body,
             "اوقات شرعی",
-            "بر اساس مختصات مکانی و زمان محلی"
+            "زمان‌بندی محاسبه‌شده بر اساس موقعیت شما"
         )
 
-        addCard(
-            body,
-            "مکان",
-            locationLabel
-        )
+        addCard(body, "موقعیت", locationLabel, true)
 
-        if (prayerJson == null) {
+        val timings = prayerJson
+            ?.optJSONObject("data")
+            ?.optJSONObject("timings")
+
+        if (timings == null) {
 
             addCard(
                 body,
-                "وضعیت",
-                "اطلاعات هنوز دریافت نشده است. اینترنت و دسترسی مکان را بررسی کنید."
+                "اطلاعات در دسترس نیست",
+                "برای دریافت اوقات شرعی، اتصال اینترنت و دسترسی مکان را بررسی کنید."
             )
 
         } else {
 
-            val timings = prayerJson!!
-                .optJSONObject("data")
-                ?.optJSONObject("timings")
-
-            val names = listOf(
+            val entries = listOf(
                 "اذان صبح" to "Fajr",
                 "طلوع آفتاب" to "Sunrise",
                 "اذان ظهر" to "Dhuhr",
@@ -660,22 +870,78 @@ class MainActivity : Activity() {
                 "نیمه‌شب شرعی" to "Midnight"
             )
 
-            names.forEach { (label, key) ->
+            entries.forEachIndexed { index, item ->
 
-                addCard(
+                val time = timings
+                    .optString(item.second, "--")
+                    .substringBefore(" ")
+
+                addPrayerTile(
                     body,
-                    label,
-                    timings?.optString(key, "--")
-                        ?.substringBefore(" ") ?: "--"
+                    item.first,
+                    time,
+                    index
                 )
             }
         }
 
         body.addView(
-            button("دریافت مجدد اوقات شرعی") {
+            actionButton("دریافت مجدد اوقات شرعی") {
                 loadPrayerTimes()
             },
             LinearLayout.LayoutParams(-1, dp(50))
+        )
+    }
+
+    private fun addPrayerTile(
+        body: LinearLayout,
+        title: String,
+        time: String,
+        index: Int
+    ) {
+
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+
+            background = rounded(
+                if (index == 0 || index == 5) darkGreen else cardColor,
+                15,
+                if (index == 0 || index == 5) gold else 0
+            )
+
+            setPadding(
+                dp(15),
+                dp(11),
+                dp(15),
+                dp(11)
+            )
+        }
+
+        row.addView(
+            label("✦", 17f, gold, true)
+        )
+
+        row.addView(
+            label(
+                title,
+                14f,
+                white,
+                true,
+                Gravity.START
+            ),
+            LinearLayout.LayoutParams(0, -2, 1f)
+        )
+
+        row.addView(
+            label(time, 17f, gold, true)
+        )
+
+        body.addView(
+            row,
+            LinearLayout.LayoutParams(-1, dp(57)).apply {
+                bottomMargin = dp(8)
+            }
         )
     }
 
@@ -683,17 +949,13 @@ class MainActivity : Activity() {
 
         val (_, body) = newPage()
 
-        addTitle(
+        addHeading(
             body,
             "هواشناسی هفت‌روزه",
-            "پیش‌بینی آنلاین بر اساس موقعیت"
+            "پیش‌بینی آنلاین بر اساس موقعیت فعلی"
         )
 
-        addCard(
-            body,
-            "مکان",
-            locationLabel
-        )
+        addCard(body, "موقعیت", locationLabel, true)
 
         val json = weatherJson
 
@@ -701,8 +963,8 @@ class MainActivity : Activity() {
 
             addCard(
                 body,
-                "وضعیت",
-                "در حال دریافت اطلاعات یا اتصال اینترنت در دسترس نیست."
+                "در انتظار اطلاعات",
+                "هنوز داده‌ای دریافت نشده است. اتصال اینترنت را بررسی یا دوباره تلاش کنید."
             )
 
         } else {
@@ -714,11 +976,36 @@ class MainActivity : Activity() {
                 Double.NaN
             ) ?: Double.NaN
 
+            val feels = current?.optDouble(
+                "apparent_temperature",
+                Double.NaN
+            ) ?: Double.NaN
+
+            val humidity = current?.optInt(
+                "relative_humidity_2m",
+                -1
+            ) ?: -1
+
+            val wind = current?.optDouble(
+                "wind_speed_10m",
+                Double.NaN
+            ) ?: Double.NaN
+
+            val code = current?.optInt("weather_code", -1) ?: -1
+
+            val now = if (temp.isNaN()) {
+                "--"
+            } else {
+                "${temp.roundToInt()}°C"
+            }
+
             addCard(
                 body,
-                "دمای فعلی",
-                if (temp.isNaN()) "--"
-                else "${temp.roundToInt()}°C"
+                "$now  •  ${weatherDescription(code)}",
+                "دمای محسوس: ${if (feels.isNaN()) "--" else "${feels.roundToInt()}°C"}\n" +
+                    "رطوبت: ${if (humidity < 0) "--" else "$humidity٪"}\n" +
+                    "سرعت باد: ${if (wind.isNaN()) "--" else "${wind.roundToInt()} کیلومتر بر ساعت"}",
+                true
             )
 
             val daily = json.optJSONObject("daily")
@@ -729,6 +1016,8 @@ class MainActivity : Activity() {
             val codes = daily?.optJSONArray("weather_code")
 
             if (dates != null) {
+
+                addSectionTitle(body, "پیش‌بینی روزانه")
 
                 for (i in 0 until dates.length()) {
 
@@ -743,7 +1032,7 @@ class MainActivity : Activity() {
 
                         SimpleDateFormat(
                             "EEEE، d MMM",
-                            Locale("fa")
+                            Locale("fa", "IR")
                         ).format(parsed ?: Date())
 
                     } catch (_: Exception) {
@@ -753,47 +1042,99 @@ class MainActivity : Activity() {
                     val high = max?.optDouble(
                         i,
                         Double.NaN
-                    )
+                    ) ?: Double.NaN
 
                     val low = min?.optDouble(
                         i,
                         Double.NaN
-                    )
+                    ) ?: Double.NaN
 
-                    val condition = weatherDescription(
+                    val description = weatherDescription(
                         codes?.optInt(i, -1) ?: -1
                     )
 
-                    addCard(
-                        body,
-                        dayName,
-                        "$condition\nبیشینه: ${
-                            high?.takeIf { !it.isNaN() }
-                                ?.roundToInt() ?: "--"
-                        }°  |  کمینه: ${
-                            low?.takeIf { !it.isNaN() }
-                                ?.roundToInt() ?: "--"
-                        }°"
+                    val highText = if (high.isNaN()) {
+                        "--"
+                    } else {
+                        "${high.roundToInt()}°"
+                    }
+
+                    val lowText = if (low.isNaN()) {
+                        "--"
+                    } else {
+                        "${low.roundToInt()}°"
+                    }
+
+                    val row = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        background = rounded(cardColor, 14)
+
+                        setPadding(
+                            dp(10),
+                            dp(8),
+                            dp(10),
+                            dp(8)
+                        )
+                    }
+
+                    row.addView(
+                        label(
+                            dayName,
+                            12f,
+                            white,
+                            true,
+                            Gravity.START
+                        ),
+                        LinearLayout.LayoutParams(0, -2, 1.2f)
+                    )
+
+                    row.addView(
+                        label(
+                            description,
+                            10.5f,
+                            muted,
+                            false
+                        ),
+                        LinearLayout.LayoutParams(0, -2, 1f)
+                    )
+
+                    row.addView(
+                        label(
+                            "$highText / $lowText",
+                            12f,
+                            gold,
+                            true
+                        ),
+                        LinearLayout.LayoutParams(0, -2, 1f)
+                    )
+
+                    body.addView(
+                        row,
+                        LinearLayout.LayoutParams(-1, dp(55)).apply {
+                            bottomMargin = dp(7)
+                        }
                     )
                 }
             }
         }
 
         body.addView(
-            button("به‌روزرسانی هواشناسی") {
+            actionButton("به‌روزرسانی هواشناسی") {
                 loadWeather()
             },
             LinearLayout.LayoutParams(-1, dp(50))
         )
     }
-        private fun showGames() {
+
+    private fun showGames() {
 
         val (_, body) = newPage()
 
-        addTitle(
+        addHeading(
             body,
             "بازی‌ها",
-            "کمی سرگرمی در کنار تقویم"
+            "سرگرمی کوتاه در کنار تقویم"
         )
 
         var secret = (1..100).random()
@@ -802,27 +1143,42 @@ class MainActivity : Activity() {
         addCard(
             body,
             "بازی حدس عدد",
-            "یک عدد بین ۱ تا ۱۰۰ انتخاب شده است. آن را حدس بزن!"
+            "یک عدد بین ۱ تا ۱۰۰ انتخاب شده است. عدد درست را پیدا کن!",
+            true
         )
 
         val input = EditText(this).apply {
-            hint = "عدد مورد نظر را وارد کن"
+
+            hint = "عدد موردنظر را وارد کن"
+
             inputType = InputType.TYPE_CLASS_NUMBER
+
             setTextColor(white)
             setHintTextColor(muted)
+
             textSize = 18f
             gravity = Gravity.CENTER
-            background = rounded(cardColor)
+
+            background = rounded(cardColor, 14)
+
+            setPadding(
+                dp(10),
+                0,
+                dp(10),
+                0
+            )
         }
 
         body.addView(
             input,
-            LinearLayout.LayoutParams(-1, dp(55))
+            LinearLayout.LayoutParams(-1, dp(54))
         )
 
-        val result = text(
+        body.addView(space(8))
+
+        val result = label(
             "منتظر حدس تو هستم",
-            16f,
+            15f,
             gold,
             true
         )
@@ -830,376 +1186,94 @@ class MainActivity : Activity() {
         body.addView(result)
 
         body.addView(
-            button("ثبت حدس") {
+            actionButton("ثبت حدس") {
 
-                val guess = input.text.toString().toIntOrNull()
+                val guess = input.text
+                    .toString()
+                    .toIntOrNull()
 
                 if (guess == null || guess !in 1..100) {
+
                     result.text = "یک عدد بین ۱ تا ۱۰۰ وارد کن"
-                    return@button
+
+                } else {
+
+                    attempts++
+
+                    when {
+                        guess == secret -> {
+                            result.text =
+                                "آفرین! عدد درست بود 🎉\nتعداد تلاش: $attempts"
+                        }
+
+                        guess < secret -> {
+                            result.text = "عدد بزرگ‌تر است"
+                        }
+
+                        else -> {
+                            result.text = "عدد کوچک‌تر است"
+                        }
+                    }
                 }
 
-                attempts++
-
-                when {
-                    guess == secret -> {
-                        result.text =
-                            "آفرین! عدد درست بود 🎉\nتعداد تلاش: $attempts"
-                    }
-
-                    guess < secret -> {
-                        result.text = "عدد بزرگ‌تر است"
-                    }
-
-                    else -> {
-                        result.text = "عدد کوچک‌تر است"
-                    }
-                }
             },
             LinearLayout.LayoutParams(-1, dp(50))
         )
 
+        body.addView(space(7))
+
         body.addView(
-            button("بازی جدید") {
+            actionButton("شروع بازی جدید") {
+
                 secret = (1..100).random()
                 attempts = 0
+
                 input.setText("")
-                result.text = "عدد جدید انتخاب شد"
+
+                result.text =
+                    "عدد جدید انتخاب شد؛ دوباره حدس بزن"
             },
             LinearLayout.LayoutParams(-1, dp(50))
         )
     }
 
     private fun loadOnlineInformation() {
-        loadWeather()
+                loadWeather()
         loadPrayerTimes()
-    }
-
-    private fun loadWeather() {
-
-        executor.execute {
-
-            try {
-
-                val url = URL(
-                    "https://api.open-meteo.com/v1/forecast" +
-                        "?latitude=$latitude" +
-                        "&longitude=$longitude" +
-                        "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m" +
-                        "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                        "&forecast_days=7" +
-                        "&timezone=auto"
-                )
-
-                val connection =
-                    url.openConnection() as HttpURLConnection
-
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
-                connection.requestMethod = "GET"
-
-                val response = connection.inputStream
-                    .bufferedReader()
-                    .use { it.readText() }
-
-                connection.disconnect()
-
-                val json = JSONObject(response)
-
-                mainHandler.post {
-
-                    weatherJson = json
-
-                    if (currentPage == 3) {
-                        showWeather()
-                    } else if (currentPage == 0) {
-                        showHome()
-                    }
-                }
-
-            } catch (e: Exception) {
-
-                mainHandler.post {
-
-                    Toast.makeText(
-                        this,
-                        "دریافت هواشناسی ناموفق بود",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-    }
-
-    private fun loadPrayerTimes() {
-
-        executor.execute {
-
-            try {
-
-                val date = SimpleDateFormat(
-                    "dd-MM-yyyy",
-                    Locale.US
-                ).format(Date())
-
-                val url = URL(
-                    "https://api.aladhan.com/v1/timings/$date" +
-                        "?latitude=$latitude" +
-                        "&longitude=$longitude" +
-                        "&method=3"
-                )
-
-                val connection =
-                    url.openConnection() as HttpURLConnection
-
-                connection.connectTimeout = 15000
-                connection.readTimeout = 15000
-                connection.requestMethod = "GET"
-
-                val response = connection.inputStream
-                    .bufferedReader()
-                    .use { it.readText() }
-
-                connection.disconnect()
-
-                val json = JSONObject(response)
-
-                mainHandler.post {
-
-                    prayerJson = json
-
-                    if (currentPage == 2) {
-                        showPrayer()
-                    } else if (currentPage == 0) {
-                        showHome()
-                    }
-                }
-
-            } catch (e: Exception) {
-
-                mainHandler.post {
-
-                    Toast.makeText(
-                        this,
-                        "دریافت اوقات شرعی ناموفق بود",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-    }
-
-    private fun weatherSummary(): String {
-
-        val current = weatherJson
-            ?.optJSONObject("current")
-
-        val temperature = current?.optDouble(
-            "temperature_2m",
-            Double.NaN
-        ) ?: Double.NaN
-
-        val humidity = current?.optInt(
-            "relative_humidity_2m",
-            -1
-        ) ?: -1
-
-        if (temperature.isNaN()) {
-            return "اطلاعات دما در دسترس نیست"
-        }
-
-        return "دما: ${temperature.roundToInt()} درجه\nرطوبت: ${if (humidity >= 0) "$humidity درصد" else "--"}"
-    }
-
-    private fun prayerSummary(): String {
-
-        val timings = prayerJson
-            ?.optJSONObject("data")
-            ?.optJSONObject("timings")
-
-        return "صبح: ${timings?.optString("Fajr", "--")}\nظهر: ${timings?.optString("Dhuhr", "--")}\nمغرب: ${timings?.optString("Maghrib", "--")}"
-    }
-
-    private fun weatherDescription(code: Int): String {
-
-        return when (code) {
-            0 -> "آفتابی"
-            1, 2 -> "کمی ابری"
-            3 -> "ابری"
-            45, 48 -> "مه‌آلود"
-            51, 53, 55 -> "نم‌نم باران"
-            61, 63, 65 -> "بارانی"
-            71, 73, 75 -> "برفی"
-            80, 81, 82 -> "رگبار باران"
-            95, 96, 99 -> "طوفان رعدوبرق"
-            else -> "وضعیت نامشخص"
-        }
     }
 
     private fun requestLocation() {
 
-        val fine = checkSelfPermission(
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        val coarse = checkSelfPermission(
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!fine && !coarse) {
-
+        if (
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        ) {
             requestPermissions(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 ),
-                1001
+                100
             )
-
             return
         }
 
         findPhoneLocation()
     }
 
-    private fun findPhoneLocation() {
-
-        try {
-
-            val manager = locationManager ?: return
-
-            val provider = when {
-
-                manager.isProviderEnabled(
-                    android.location.LocationManager.GPS_PROVIDER
-                ) -> android.location.LocationManager.GPS_PROVIDER
-
-                manager.isProviderEnabled(
-                    android.location.LocationManager.NETWORK_PROVIDER
-                ) -> android.location.LocationManager.NETWORK_PROVIDER
-
-                else -> null
-            }
-
-            if (provider == null) {
-                loadOnlineInformation()
-                return
-            }
-
-            val listener =
-                object : android.location.LocationListener {
-
-                    override fun onLocationChanged(
-                        location: android.location.Location
-                    ) {
-
-                        useLocation(location)
-                    }
-
-                    override fun onProviderEnabled(
-                        provider: String
-                    ) {}
-
-                    override fun onProviderDisabled(
-                        provider: String
-                    ) {}
-                }
-
-            locationListener = listener
-
-            val fine = checkSelfPermission(
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-            val coarse = checkSelfPermission(
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (!fine && !coarse) {
-                loadOnlineInformation()
-                return
-            }
-
-            val last = try {
-                manager.getLastKnownLocation(provider)
-            } catch (_: SecurityException) {
-                null
-            }
-
-            if (last != null) {
-                useLocation(last)
-            }
-
-            manager.requestLocationUpdates(
-                provider,
-                10000L,
-                100f,
-                listener,
-                Looper.getMainLooper()
-            )
-
-            if (last == null) {
-                loadOnlineInformation()
-            }
-
-        } catch (_: Exception) {
-
-            loadOnlineInformation()
-        }
-    }
-
-    private fun useLocation(
-        location: android.location.Location
-    ) {
-
-        latitude = location.latitude
-        longitude = location.longitude
-
-        locationLabel =
-            "عرض: ${"%.4f".format(Locale.US, latitude)}، طول: ${
-                "%.4f".format(Locale.US, longitude)
-            }"
-
-        stopLocationUpdates()
-
-        loadOnlineInformation()
-
-        if (currentPage == 0) {
-            showHome()
-        }
-    }
-
-    private fun stopLocationUpdates() {
-
-        try {
-
-            locationListener?.let {
-                locationManager?.removeUpdates(it)
-            }
-
-        } catch (_: Exception) {
-        }
-
-        locationListener = null
-    }
-
-    @Deprecated("Deprecated in Android")
     override fun onRequestPermissionsResult(
         requestCode: Int,
         permissions: Array<out String>,
         grantResults: IntArray
     ) {
-
         super.onRequestPermissionsResult(
             requestCode,
             permissions,
             grantResults
         )
 
-        if (requestCode == 1001) {
-
-            if (
-                grantResults.any {
+        if (requestCode == 100) {
+            if (grantResults.any {
                     it == PackageManager.PERMISSION_GRANTED
                 }
             ) {
@@ -1210,150 +1284,487 @@ class MainActivity : Activity() {
         }
     }
 
-    // تبدیل تاریخ میلادی به تاریخ شمسی
+    private fun findPhoneLocation() {
 
-    
-// تبدیل تاریخ میلادی به تقویم شمسی
-private fun persianCalendar(
-    calendar: Calendar
-): android.icu.util.Calendar {
-    val persian = android.icu.util.Calendar.getInstance(
-        Locale.forLanguageTag("fa-IR-u-ca-persian")
-    )
-    persian.timeInMillis = calendar.timeInMillis
-    return persian
-}
+        try {
+            val manager = locationManager ?: return
 
-private fun toJalali(
-    year: Int,
-    month: Int,
-    day: Int
-): IntArray {
-    val calendar = Calendar.getInstance()
+            val gpsEnabled = manager.isProviderEnabled(
+                LocationManager.GPS_PROVIDER
+            )
 
-    calendar.set(
-        year,
-        month - 1,
-        day,
-        12,
-        0,
-        0
-    )
+            val networkEnabled = manager.isProviderEnabled(
+                LocationManager.NETWORK_PROVIDER
+            )
 
-    val p = persianCalendar(calendar)
+            val provider = when {
+                gpsEnabled -> LocationManager.GPS_PROVIDER
+                networkEnabled -> LocationManager.NETWORK_PROVIDER
+                else -> null
+            }
 
-    return intArrayOf(
-        p.get(android.icu.util.Calendar.YEAR),
-        p.get(android.icu.util.Calendar.MONTH) + 1,
-        p.get(android.icu.util.Calendar.DAY_OF_MONTH)
-    )
-}
+            if (provider == null) {
+                loadOnlineInformation()
+                return
+            }
 
+            val lastLocation = try {
+                manager.getLastKnownLocation(provider)
+            } catch (_: SecurityException) {
+                null
+            }
 
-private fun toGregorian(
-    year: Int,
-    month: Int,
-    day: Int
-): IntArray {
-    val p = android.icu.util.Calendar.getInstance(
-        Locale.forLanguageTag("fa-IR-u-ca-persian")
-    )
+            if (lastLocation != null) {
+                useLocation(lastLocation)
+                return
+            }
 
-    p.clear()
-    p.set(android.icu.util.Calendar.YEAR, year)
-    p.set(android.icu.util.Calendar.MONTH, month - 1)
-    p.set(android.icu.util.Calendar.DAY_OF_MONTH, day)
+            val listener = object : LocationListener {
 
-    val g = Calendar.getInstance()
-    g.timeInMillis = p.timeInMillis
+                override fun onLocationChanged(location: Location) {
+                    useLocation(location)
+                }
 
-    return intArrayOf(
-        g.get(Calendar.YEAR),
-        g.get(Calendar.MONTH) + 1,
-        g.get(Calendar.DAY_OF_MONTH)
-    )
-}
+                override fun onProviderEnabled(provider: String) {}
 
+                override fun onProviderDisabled(provider: String) {}
+            }
 
-    private fun jalaliDate(
-        calendar: Calendar
-    ): String {
+            locationListener = listener
+
+            manager.requestLocationUpdates(
+                provider,
+                3000L,
+                10f,
+                listener,
+                Looper.getMainLooper()
+            )
+
+            mainHandler.postDelayed({
+                if (locationListener != null) {
+                    stopLocationUpdates()
+                    loadOnlineInformation()
+                }
+            }, 15000L)
+
+        } catch (_: Exception) {
+            loadOnlineInformation()
+        }
+    }
+
+    private fun useLocation(location: Location) {
+
+        latitude = location.latitude
+        longitude = location.longitude
+
+        locationLabel = String.format(
+            Locale.US,
+            "%.4f, %.4f",
+            latitude,
+            longitude
+        )
+
+        stopLocationUpdates()
+
+        mainHandler.post {
+            when (currentPage) {
+                0 -> showHome()
+                2 -> showPrayer()
+                3 -> showWeather()
+            }
+        }
+
+        loadOnlineInformation()
+    }
+
+    private fun stopLocationUpdates() {
+
+        try {
+            locationListener?.let {
+                locationManager?.removeUpdates(it)
+            }
+        } catch (_: Exception) {
+        }
+
+        locationListener = null
+    }
+
+    private fun loadWeather() {
+
+        executor.execute {
+
+            var connection: HttpURLConnection? = null
+
+            try {
+
+                val address =
+                    "https://api.open-meteo.com/v1/forecast" +
+                    "?latitude=$latitude" +
+                    "&longitude=$longitude" +
+                    "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m" +
+                    "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                    "&timezone=auto" +
+                    "&forecast_days=7"
+
+                connection = URL(address)
+                    .openConnection() as HttpURLConnection
+
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.requestMethod = "GET"
+
+                val response = connection.inputStream
+                    .bufferedReader()
+                    .use { it.readText() }
+
+                val result = JSONObject(response)
+
+                mainHandler.post {
+                    weatherJson = result
+
+                    when (currentPage) {
+                        0 -> showHome()
+                        3 -> showWeather()
+                    }
+                }
+
+            } catch (_: Exception) {
+
+                mainHandler.post {
+                    Toast.makeText(
+                        this,
+                        "دریافت هواشناسی ناموفق بود",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+            } finally {
+                connection?.disconnect()
+            }
+        }
+    }
+
+    private fun loadPrayerTimes() {
+
+        executor.execute {
+
+            var connection: HttpURLConnection? = null
+
+            try {
+
+                val date = SimpleDateFormat(
+                    "dd-MM-yyyy",
+                    Locale.US
+                ).format(Date())
+
+                val address =
+                    "https://api.aladhan.com/v1/timings/$date" +
+                    "?latitude=$latitude" +
+                    "&longitude=$longitude" +
+                    "&method=3"
+
+                connection = URL(address)
+                    .openConnection() as HttpURLConnection
+
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.requestMethod = "GET"
+
+                val response = connection.inputStream
+                    .bufferedReader()
+                    .use { it.readText() }
+
+                val result = JSONObject(response)
+
+                mainHandler.post {
+                    prayerJson = result
+
+                    when (currentPage) {
+                        0 -> showHome()
+                        2 -> showPrayer()
+                    }
+                }
+
+            } catch (_: Exception) {
+
+                mainHandler.post {
+                    Toast.makeText(
+                        this,
+                        "دریافت اوقات شرعی ناموفق بود",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+            } finally {
+                connection?.disconnect()
+            }
+        }
+    }
+
+    private fun weatherDescription(code: Int): String {
+
+        return when (code) {
+            0 -> "آسمان صاف"
+            1, 2 -> "کمی ابری"
+            3 -> "ابری"
+            45, 48 -> "مه‌آلود"
+            51, 53, 55 -> "نم‌نم باران"
+            61, 63, 65 -> "بارانی"
+            71, 73, 75 -> "برفی"
+            80, 81, 82 -> "رگبار باران"
+            95, 96, 99 -> "رعد و برق"
+            else -> "وضعیت نامشخص"
+        }
+    }
+
+    private fun weekday(calendar: Calendar): String {
+
+        val names = listOf(
+            "یکشنبه",
+            "دوشنبه",
+            "سه‌شنبه",
+            "چهارشنبه",
+            "پنجشنبه",
+            "جمعه",
+            "شنبه"
+        )
+
+        return names[calendar.get(Calendar.DAY_OF_WEEK) - 1]
+    }
+
+    private fun gregorianDate(calendar: Calendar): String {
+
+        val format = SimpleDateFormat(
+            "yyyy/MM/dd",
+            Locale.US
+        )
+
+        return "تاریخ میلادی: ${format.format(calendar.time)}"
+    }
+
+    private fun toJalali(
+        gy: Int,
+        gm: Int,
+        gd: Int
+    ): IntArray {
+
+        val gDays = intArrayOf(
+            0, 31, 59, 90, 120, 151,
+            181, 212, 243, 273, 304, 334
+        )
+
+        val gy2 = if (gm > 2) gy + 1 else gy
+
+        var days =
+            355666 +
+            365 * gy +
+            (gy2 + 3) / 4 -
+            (gy2 + 99) / 100 +
+            (gy2 + 399) / 400 +
+            gd +
+            gDays[gm - 1]
+
+        var jy = -1595 + 33 * (days / 12053)
+
+        days %= 12053
+
+        jy += 4 * (days / 1461)
+
+        days %= 1461
+
+        if (days > 365) {
+            jy += (days - 1) / 365
+            days = (days - 1) % 365
+        }
+
+        val jm: Int
+        val jd: Int
+
+        if (days < 186) {
+            jm = 1 + days / 31
+            jd = 1 + days % 31
+        } else {
+            jm = 7 + (days - 186) / 30
+            jd = 1 + (days - 186) % 30
+        }
+
+        return intArrayOf(jy, jm, jd)
+    }
+
+    private fun jalaliMonthName(month: Int): String {
+
+        return when (month) {
+            1 -> "فروردین"
+            2 -> "اردیبهشت"
+            3 -> "خرداد"
+            4 -> "تیر"
+            5 -> "مرداد"
+            6 -> "شهریور"
+            7 -> "مهر"
+            8 -> "آبان"
+            9 -> "آذر"
+            10 -> "دی"
+            11 -> "بهمن"
+            12 -> "اسفند"
+            else -> ""
+        }
+    }
+
+    private fun jalaliMonthTitle(calendar: Calendar): String {
 
         val j = toJalali(
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH) + 1,
-            calendar.get(Calendar.DAY_OF_MONTH)
+            1
         )
 
-        return "${j[0]}/${j[1]} ${j[2]}"
-    }
-
-
-    private fun weekday(
-        calendar: Calendar
-    ): String {
-
-        return SimpleDateFormat(
-            "EEEE",
-            Locale("fa", "IR")
-        ).format(calendar.time)
-    }
-
-    private fun jalaliMonthTitle(
-        calendar: Calendar
-    ): String {
-
-        val j = toJalali(
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH) + 1,
-            calendar.get(Calendar.DAY_OF_MONTH)
-        )
-
-        val months = listOf(
-            "فروردین",
-            "اردیبهشت",
-            "خرداد",
-            "تیر",
-            "مرداد",
-            "شهریور",
-            "مهر",
-            "آبان",
-            "آذر",
-            "دی",
-            "بهمن",
-            "اسفند"
-        )
-
-        return "${months[j[1] - 1]} ${j[0]}"
+        return "${jalaliMonthName(j[1])} ${j[0]}"
     }
 
     private fun firstDayOfJalaliMonth(
         calendar: Calendar
     ): Calendar {
 
-        val p = persianCalendar(calendar)
-
-        p.set(
-            android.icu.util.Calendar.DAY_OF_MONTH,
+        val j = toJalali(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
             1
         )
 
-        val result = Calendar.getInstance()
+        val greg = toGregorian(j[0], j[1], 1)
 
-        result.timeInMillis = p.timeInMillis
-
-        return result
+        return Calendar.getInstance().apply {
+            set(
+                greg[0],
+                greg[1] - 1,
+                greg[2],
+                12,
+                0,
+                0
+            )
+        }
     }
 
-    private fun jalaliMonthLength(
-        calendar: Calendar
-    ): Int {
+    private fun jalaliMonthLength(calendar: Calendar): Int {
 
-        val p = persianCalendar(calendar)
+        val j = toJalali(
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH) + 1,
+            1
+        )
 
-        return p.getActualMaximum(
-            android.icu.util.Calendar.DAY_OF_MONTH
+        return when {
+            j[1] <= 6 -> 31
+            j[1] <= 11 -> 30
+            else -> {
+                val nextYear = toGregorian(j[0] + 1, 1, 1)
+                val currentYear = toGregorian(j[0], 1, 1)
+
+                val first = Calendar.getInstance().apply {
+                    set(
+                        currentYear[0],
+                        currentYear[1] - 1,
+                        currentYear[2],
+                        12,
+                        0,
+                        0
+                    )
+                }
+
+                val next = Calendar.getInstance().apply {
+                    set(
+                        nextYear[0],
+                        nextYear[1] - 1,
+                        nextYear[2],
+                        12,
+                        0,
+                        0
+                    )
+                }
+
+                val days = (
+                    (next.timeInMillis - first.timeInMillis) /
+                    (24L * 60L * 60L * 1000L)
+                ).toInt()
+
+                if (days > 365) 30 else 29
+            }
+        }
+    }
+
+    private fun toGregorian(
+        jy: Int,
+        jm: Int,
+        jd: Int
+    ): IntArray {
+
+        val year = jy + 1595
+
+        var days =
+            -355668 +
+            365 * year +
+            (year / 33) * 8 +
+            ((year % 33 + 3) / 4)
+
+        if (jm <= 6) {
+            days += (jm - 1) * 31
+        } else {
+            days += 186 + (jm - 7) * 30
+        }
+
+        days += jd - 1
+
+        var gy = 400 * (days / 146097)
+
+        days %= 146097
+
+        if (days > 36524) {
+            gy += 100 * (--days / 36524)
+            days %= 36524
+
+            if (days >= 365) {
+                days++
+            }
+        }
+
+        gy += 4 * (days / 1461)
+
+        days %= 1461
+
+        if (days > 365) {
+            gy += (days - 1) / 365
+            days = (days - 1) % 365
+        }
+
+        val gd = days + 1
+
+        val leap =
+            gy % 4 == 0 &&
+            (gy % 100 != 0 || gy % 400 == 0)
+
+        val monthDays = intArrayOf(
+            0,
+            31,
+            if (leap) 29 else 28,
+            31, 30, 31, 30,
+            31, 31, 30, 31, 30, 31
+        )
+
+        var gm = 1
+        var remaining = gd
+
+        while (
+            gm <= 12 &&
+            remaining > monthDays[gm]
+        ) {
+            remaining -= monthDays[gm]
+            gm++
+        }
+
+        return intArrayOf(
+            gy,
+            gm,
+            remaining
         )
     }
-
 }
