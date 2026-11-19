@@ -2,6 +2,7 @@ package ir.taqvimm.an
 
 import android.Manifest
 import android.app.Activity
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -13,7 +14,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.widget.Button
+import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -26,6 +31,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import java.util.concurrent.Executors
+import kotlin.math.abs
+import kotlin.random.Random
 
 class MainActivity : Activity() {
 
@@ -33,15 +40,17 @@ class MainActivity : Activity() {
     private val green2 = Color.rgb(28, 105, 88)
     private val mint = Color.rgb(225, 241, 235)
     private val gold = Color.rgb(218, 171, 91)
-    private val bg = Color.rgb(241, 245, 247)
+    private val black = Color.rgb(20, 24, 23)
+    private val bg = Color.rgb(241, 245, 242)
     private val white = Color.WHITE
-    private val gray = Color.rgb(111, 124, 130)
-    private val blue = Color.rgb(42, 104, 157)
-    private val red = Color.rgb(190, 55, 55)
+    private val gray = Color.rgb(110, 120, 116)
+    private val blue = Color.rgb(55, 125, 190)
+    private val red = Color.rgb(190, 65, 65)
 
-    private lateinit var displayedMonth: Calendar
-    private var selectedDay = 1
-    private var currentMode = "prayer"
+    private var displayedMonth = Calendar.getInstance()
+    private var selectedDay = 0
+    private var currentPage = 0
+    private var currentMode = ""
 
     private val executor = Executors.newSingleThreadExecutor()
     private val handler = Handler(Looper.getMainLooper())
@@ -49,13 +58,22 @@ class MainActivity : Activity() {
     private var locationManager: LocationManager? = null
     private var locationListener: LocationListener? = null
 
-    private lateinit var liveStatus: TextView
-    private lateinit var prayerBox: LinearLayout
-    private lateinit var weatherBox: LinearLayout
+    private var liveStatus: TextView? = null
+    private var prayerBox: LinearLayout? = null
+    private var weatherBox: LinearLayout? = null
 
-    private val permissionCode = 501
+    private var permissionCode = 501
+    private var gameNumber = Random.nextInt(1, 6)
 
-    private val months = arrayOf(
+    private val pageNames = listOf(
+        "خانه",
+        "تقویم شمسی",
+        "اوقات شرعی",
+        "هواشناسی",
+        "بازی‌ها"
+    )
+
+    private val persianMonths = arrayOf(
         "فروردین", "اردیبهشت", "خرداد",
         "تیر", "مرداد", "شهریور",
         "مهر", "آبان", "آذر",
@@ -69,11 +87,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        displayedMonth = newPersianCalendar()
-        displayedMonth.timeInMillis = System.currentTimeMillis()
-        selectedDay = displayedMonth.get(Calendar.DAY_OF_MONTH)
-
+        window.statusBarColor = green
+        window.navigationBarColor = black
         showHome()
     }
 
@@ -82,374 +97,950 @@ class MainActivity : Activity() {
     }
 
     private fun newPersianCalendar(): Calendar {
-        return Calendar.getInstance(
-            TimeZone.getTimeZone("Asia/Tehran"),
-            Locale.forLanguageTag("fa-IR-u-ca-persian")
+        val calendar = Calendar.getInstance(
+            TimeZone.getDefault(),
+            Locale("fa", "IR")
         )
+        calendar.setTimeInMillis(System.currentTimeMillis())
+        return calendar
     }
 
     private fun fa(number: Int): String {
-        val digits = "۰۱۲۳۴۵۶۷۸۹"
+        val digits = arrayOf(
+            "۰", "۱", "۲", "۳", "۴",
+            "۵", "۶", "۷", "۸", "۹"
+        )
         return number.toString().map {
-            if (it in '0'..'9') digits[it - '0'] else it
+            if (it.isDigit()) digits[it.digitToInt()] else it.toString()
         }.joinToString("")
     }
 
     private fun faText(value: String): String {
-        return value.map {
-            if (it in '0'..'9') "۰۱۲۳۴۵۶۷۸۹"[it - '0'] else it
-        }.joinToString("")
+        val english = "0123456789"
+        val persian = "۰۱۲۳۴۵۶۷۸۹"
+        var result = value
+        for (i in english.indices) {
+            result = result.replace(english[i], persian[i])
+        }
+        return result
     }
 
     private fun rounded(
         color: Int,
-        radius: Int = 20
+        radius: Int = 18,
+        strokeColor: Int = Color.TRANSPARENT,
+        strokeWidth: Int = 0
     ): GradientDrawable {
         return GradientDrawable().apply {
             setColor(color)
             cornerRadius = dp(radius).toFloat()
+            if (strokeWidth > 0) {
+                setStroke(dp(strokeWidth), strokeColor)
+            }
         }
     }
 
     private fun gradient(
         first: Int,
-        second: Int
+        second: Int,
+        radius: Int = 20
     ): GradientDrawable {
         return GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(first, second)
         ).apply {
-            cornerRadius = dp(24).toFloat()
+            cornerRadius = dp(radius).toFloat()
         }
     }
 
     private fun label(
         value: String,
-        size: Float,
-        color: Int = green,
-        bold: Boolean = false,
-        gravityValue: Int = Gravity.CENTER
+        size: Float = 15f,
+        color: Int = black,
+        bold: Boolean = false
     ): TextView {
         return TextView(this).apply {
             text = value
             textSize = size
             setTextColor(color)
-            gravity = gravityValue
-            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.CENTER_VERTICAL
             if (bold) typeface = Typeface.DEFAULT_BOLD
-            setPadding(dp(5), dp(5), dp(5), dp(5))
         }
     }
 
-    private fun page(): Pair<ScrollView, LinearLayout> {
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(bg)
-            isFillViewport = true
-        }
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            setPadding(dp(16), dp(16), dp(16), dp(25))
-        }
-
-        scroll.addView(root)
-        return Pair(scroll, root)
-    }
-
-    private fun margins(
-        top: Int = 8,
-        bottom: Int = 8
-    ): LinearLayout.LayoutParams {
-        return LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            setMargins(0, dp(top), 0, dp(bottom))
-        }
-    }
-
-    private fun actionCard(
-        icon: String,
-        title: String,
-        description: String,
-        color: Int,
-        action: () -> Unit
+    private fun card(
+        color: Int = white,
+        padding: Int = 16
     ): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = rounded(white, 22)
+            setPadding(dp(padding), dp(padding), dp(padding), dp(padding))
+            background = rounded(color, 20)
             elevation = dp(3).toFloat()
-            setPadding(dp(8), dp(12), dp(8), dp(12))
-            isClickable = true
-            isFocusable = true
+        }
+    }
+
+    private fun addSpace(
+        parent: LinearLayout,
+        height: Int = 12
+    ) {
+        parent.addView(
+            View(this),
+            LinearLayout.LayoutParams(1, dp(height))
+        )
+    }
+
+    private fun addText(
+        parent: LinearLayout,
+        value: String,
+        size: Float = 15f,
+        color: Int = black,
+        bold: Boolean = false
+    ): TextView {
+        val view = label(value, size, color, bold)
+        parent.addView(
+            view,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+        return view
+    }
+
+    private fun addButton(
+        parent: LinearLayout,
+        text: String,
+        color: Int = green,
+        textColor: Int = white,
+        action: () -> Unit
+    ) {
+        val button = Button(this).apply {
+            this.text = text
+            setTextColor(textColor)
+            textSize = 14f
+            isAllCaps = false
+            background = rounded(color, 14)
             setOnClickListener { action() }
+        }
 
-            addView(label(icon, 30f))
-            addView(label(title, 15f, green, true))
-            addView(label(description, 10f, gray))
+        parent.addView(
+            button,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(50)
+            ).apply {
+                topMargin = dp(6)
+                bottomMargin = dp(6)
+            }
+        )
+    }
 
-            val line = View(this@MainActivity).apply {
-                background = rounded(color, 4)
+    private fun makeScroll(): Pair<ScrollView, LinearLayout> {
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(18), dp(16), dp(24))
+        }
+
+        val scroll = ScrollView(this).apply {
+            fillViewport = true
+            isVerticalScrollBarEnabled = false
+            addView(
+                body,
+                ScrollView.LayoutParams(
+                    ScrollView.LayoutParams.MATCH_PARENT,
+                    ScrollView.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        return Pair(scroll, body)
+    }
+
+    private fun addHeader(
+        body: LinearLayout,
+        title: String,
+        subtitle: String
+    ) {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = gradient(green, green2, 24)
+            setPadding(dp(20), dp(20), dp(20), dp(20))
+        }
+
+        addText(header, title, 23f, white, true)
+        addSpace(header, 8)
+        addText(header, subtitle, 13f, mint)
+
+        body.addView(
+            header,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dp(18)
+            }
+        )
+    }
+
+    private fun installPage(content: View, index: Int) {
+        currentPage = index
+
+        val root = SwipeFrameLayout(this)
+
+        val mainLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(bg)
+        }
+
+        mainLayout.addView(
+            content,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
+        )
+
+        val navigation = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(7), dp(8), dp(7))
+            setBackgroundColor(black)
+        }
+
+        val previous = TextView(this).apply {
+            text = "❮ قبلی"
+            textSize = 13f
+            setTextColor(if (index == 0) gray else gold)
+            gravity = Gravity.CENTER
+            setOnClickListener {
+                if (currentPage > 0) navigateTo(currentPage - 1)
+            }
+        }
+
+        navigation.addView(
+            previous,
+            LinearLayout.LayoutParams(0, dp(48), 1f)
+        )
+
+        val indicator = TextView(this).apply {
+            text = "صفحه ${fa(index + 1)} از ${fa(5)}"
+            textSize = 13f
+            setTextColor(white)
+            gravity = Gravity.CENTER
+        }
+
+        navigation.addView(
+            indicator,
+            LinearLayout.LayoutParams(0, dp(48), 1.5f)
+        )
+
+        val next = TextView(this).apply {
+            text = "بعدی ❯"
+            textSize = 13f
+            setTextColor(if (index == 4) gray else gold)
+            gravity = Gravity.CENTER
+            setOnClickListener {
+                if (currentPage < 4) navigateTo(currentPage + 1)
+            }
+        }
+
+        navigation.addView(
+            next,
+            LinearLayout.LayoutParams(0, dp(48), 1f)
+        )
+
+        mainLayout.addView(
+            navigation,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(62)
+            )
+        )
+
+        root.addView(
+            mainLayout,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+
+        root.onSwipe = { direction ->
+            navigateTo((currentPage + direction).coerceIn(0, 4))
+        }
+
+        setContentView(root)
+    }
+
+    private fun navigateTo(index: Int) {
+        when (index) {
+            0 -> showHome()
+            1 -> showCalendar()
+            2 -> showLiveInfo("prayer")
+            3 -> showLiveInfo("weather")
+            4 -> showGames()
+        }
+    }
+
+    private fun showHome() {
+        currentPage = 0
+
+        val (scroll, body) = makeScroll()
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = gradient(
+                Color.rgb(8, 48, 42),
+                Color.rgb(29, 111, 88),
+                26
+            )
+            setPadding(dp(22), dp(24), dp(22), dp(24))
+        }
+
+        addText(header, "تقویم من", 27f, white, true)
+        addSpace(header, 8)
+        addText(
+            header,
+            "تقویم هوشمند، اوقات شرعی و هواشناسی آنلاین",
+            13f,
+            mint
+        )
+        addSpace(header, 18)
+
+        val today = newPersianCalendar()
+        val year = today.get(Calendar.YEAR)
+        val month = today.get(Calendar.MONTH)
+        val day = today.get(Calendar.DAY_OF_MONTH)
+
+        val dateText = TextView(this).apply {
+            text = "${fa(day)} ${persianMonths[month]} ${fa(year)}"
+            textSize = 23f
+            setTextColor(gold)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+
+        header.addView(dateText)
+
+        body.addView(
+            header,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dp(18)
+            }
+        )
+
+        addText(body, "امکانات برنامه", 19f, green, true)
+        addSpace(body, 12)
+
+        addHomeCard(
+            body, "📅", "تقویم شمسی",
+            "مشاهده روزها و ماه‌های سال", 1
+        )
+
+        addHomeCard(
+            body, "🕌", "اوقات شرعی",
+            "نمایش آنلاین زمان نمازها بر اساس مکان", 2
+        )
+
+        addHomeCard(
+            body, "🌤", "هواشناسی",
+            "پیش‌بینی وضعیت آب‌وهوا برای هفت روز", 3
+        )
+
+        addHomeCard(
+            body, "🎮", "بازی‌ها",
+            "بازی سرگرم‌کننده و کوتاه", 4
+        )
+
+        addSpace(body, 12)
+
+        val footer = card(green, 16)
+        addText(footer, "تقویم من", 17f, gold, true)
+        addText(
+            footer,
+            "برای جابه‌جایی صفحات، انگشت خود را به چپ یا راست بکشید.",
+            13f,
+            white
+        )
+
+        body.addView(
+            footer,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        installPage(scroll, 0)
+    }
+
+    private fun addHomeCard(
+        parent: LinearLayout,
+        emoji: String,
+        title: String,
+        description: String,
+        page: Int
+    ) {
+        val item = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rounded(white, 18)
+            setPadding(dp(15), dp(15), dp(15), dp(15))
+            elevation = dp(2).toFloat()
+            isClickable = true
+            setOnClickListener { navigateTo(page) }
+        }
+
+        val icon = TextView(this).apply {
+            text = emoji
+            textSize = 30f
+            gravity = Gravity.CENTER
+        }
+
+        item.addView(icon, LinearLayout.LayoutParams(dp(58), dp(58)))
+
+        val texts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(12), 0, 0, 0)
+        }
+
+        addText(texts, title, 16f, green, true)
+        addSpace(texts, 5)
+        addText(texts, description, 12f, gray)
+
+        item.addView(
+            texts,
+            LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            )
+        )
+
+        parent.addView(
+            item,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                bottomMargin = dp(12)
+            }
+        )
+    }
+
+    private inner class SwipeFrameLayout(
+        context: Context
+    ) : FrameLayout(context) {
+
+        var onSwipe: ((Int) -> Unit)? = null
+
+        private var downX = 0f
+        private var downY = 0f
+        private var handled = false
+
+        override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    handled = false
+                }
+
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+
+                    if (
+                        abs(dx) > dp(65) &&
+                        abs(dx) > abs(dy) * 1.35f
+                    ) {
+                        handled = true
+                        return true
+                    }
+                }
             }
 
-            addView(
-                line,
-                LinearLayout.LayoutParams(dp(35), dp(4)).apply {
-                    topMargin = dp(8)
+            return super.onInterceptTouchEvent(event)
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                    return true
+                }
+
+                MotionEvent.ACTION_UP -> {
+                    if (handled) {
+                        val dx = event.x - downX
+                        if (abs(dx) > dp(65)) {
+                            onSwipe?.invoke(if (dx < 0) 1 else -1)
+                        }
+                    }
+                    handled = false
+                    return true
+                }
+
+                MotionEvent.ACTION_CANCEL -> {
+                    handled = false
+                    return true
+                }
+            }
+
+            return true
+        }
+    }    // ==============================
+    // صفحه دوم: تقویم شمسی
+    // ==============================
+
+    private fun showCalendar() {
+        currentPage = 1
+
+        val (scroll, body) = makeScroll()
+
+        addHeader(
+            body,
+            "تقویم شمسی",
+            "نمایش ماه‌ها و انتخاب روزهای سال"
+        )
+
+        val calendar = displayedMonth.clone() as Calendar
+
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH)
+        val today = newPersianCalendar()
+
+        val monthCard = card(green, 16)
+
+        val monthTitle = TextView(this).apply {
+            text = "${persianMonths[month]} ${fa(year)}"
+            textSize = 23f
+            setTextColor(gold)
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+        }
+
+        monthCard.addView(
+            monthTitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(48)
+            )
+        )
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        val previousMonth = TextView(this).apply {
+            text = "❮ ماه قبل"
+            textSize = 14f
+            setTextColor(white)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener {
+                displayedMonth.add(Calendar.MONTH, -1)
+                selectedDay = 0
+                showCalendar()
+            }
+        }
+
+        val nextMonth = TextView(this).apply {
+            text = "ماه بعد ❯"
+            textSize = 14f
+            setTextColor(white)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener {
+                displayedMonth.add(Calendar.MONTH, 1)
+                selectedDay = 0
+                showCalendar()
+            }
+        }
+
+        controls.addView(
+            previousMonth,
+            LinearLayout.LayoutParams(0, dp(45), 1f)
+        )
+
+        controls.addView(
+            nextMonth,
+            LinearLayout.LayoutParams(0, dp(45), 1f)
+        )
+
+        monthCard.addView(controls)
+
+        val grid = GridLayout(this).apply {
+            columnCount = 7
+            rowCount = 7
+            alignmentMode = GridLayout.ALIGN_BOUNDS
+            useDefaultMargins = false
+        }
+
+        val headers = arrayOf(
+            "ش", "ی", "د", "س", "چ", "پ", "ج"
+        )
+
+        for (dayName in headers) {
+            val cell = TextView(this).apply {
+                text = dayName
+                textSize = 14f
+                setTextColor(gold)
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+            }
+
+            grid.addView(
+                cell,
+                GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = dp(42)
+                    columnSpec = GridLayout.spec(
+                        GridLayout.UNDEFINED,
+                        1f
+                    )
                 }
             )
         }
-    }
 
-    private fun addTwoCards(
-        root: LinearLayout,
-        first: View,
-        second: View
-    ) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
+        val firstDay = calendar.clone() as Calendar
+        firstDay.set(Calendar.DAY_OF_MONTH, 1)
+
+        // شروع هفته از شنبه
+        val offset = firstDay.get(Calendar.DAY_OF_WEEK) % 7
+        val maxDays = firstDay.getActualMaximum(
+            Calendar.DAY_OF_MONTH
+        )
+
+        for (i in 0 until offset) {
+            val empty = TextView(this)
+            grid.addView(
+                empty,
+                GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = dp(46)
+                    columnSpec = GridLayout.spec(
+                        GridLayout.UNDEFINED,
+                        1f
+                    )
+                }
+            )
         }
 
-        row.addView(
-            first,
-            LinearLayout.LayoutParams(0, dp(140), 1f).apply {
-                marginStart = dp(5)
-                marginEnd = dp(5)
+        for (day in 1..maxDays) {
+            val isToday =
+                year == today.get(Calendar.YEAR) &&
+                month == today.get(Calendar.MONTH) &&
+                day == today.get(Calendar.DAY_OF_MONTH)
+
+            val isSelected = selectedDay == day
+
+            val cell = TextView(this).apply {
+                text = fa(day)
+                textSize = 15f
+                gravity = Gravity.CENTER
+                setTextColor(
+                    when {
+                        isSelected -> white
+                        isToday -> gold
+                        else -> black
+                    }
+                )
+
+                background = rounded(
+                    when {
+                        isSelected -> green2
+                        isToday -> green
+                        else -> Color.TRANSPARENT
+                    },
+                    12
+                )
+
+                setOnClickListener {
+                    selectedDay = day
+                    showCalendar()
+                }
             }
-        )
 
-        row.addView(
-            second,
-            LinearLayout.LayoutParams(0, dp(140), 1f).apply {
-                marginStart = dp(5)
-                marginEnd = dp(5)
-            }
-        )
-
-        root.addView(row, margins(5, 5))
-    }
-
-    // صفحه اصلی
-
-    private fun showHome() {
-        val (scroll, root) = page()
-
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = gradient(green, green2)
-            elevation = dp(4).toFloat()
-            setPadding(dp(18), dp(22), dp(18), dp(22))
+            grid.addView(
+                cell,
+                GridLayout.LayoutParams().apply {
+                    width = 0
+                    height = dp(46)
+                    columnSpec = GridLayout.spec(
+                        GridLayout.UNDEFINED,
+                        1f
+                    )
+                    setMargins(dp(2), dp(2), dp(2), dp(2))
+                }
+            )
         }
 
-        hero.addView(label("تقویم من", 29f, white, true))
-        hero.addView(
-            label("مدیریت هوشمند روزهای شما", 13f, white)
-        )
-        hero.addView(
-            label("POUYAN • TAQVIM MAN", 10f, gold, true)
-        )
-
-        root.addView(hero, margins(0, 13))
-
-        val today = newPersianCalendar().apply {
-            timeInMillis = System.currentTimeMillis()
-        }
-
-        val dateCard = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            background = rounded(white, 22)
-            elevation = dp(2).toFloat()
-            setPadding(dp(13), dp(12), dp(13), dp(12))
-        }
-
-        val dateInfo = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        dateInfo.addView(
-            label(
-                "امروز • ${weekdays[today.get(Calendar.DAY_OF_WEEK) % 7]}",
-                12f, gray, true, Gravity.RIGHT
+        monthCard.addView(
+            grid,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
 
-        dateInfo.addView(
-            label(
-                "${fa(today.get(Calendar.DAY_OF_MONTH))} " +
-                    "${months[today.get(Calendar.MONTH)]} " +
-                    fa(today.get(Calendar.YEAR)),
-                21f, green, true, Gravity.RIGHT
+        body.addView(
+            monthCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
 
-        dateCard.addView(
-            label("📆", 30f),
-            LinearLayout.LayoutParams(dp(55), dp(60))
+        addSpace(body, 16)
+
+        val selectedCard = card(white)
+
+        val selected = if (selectedDay > 0) {
+            selectedDay
+        } else {
+            today.get(Calendar.DAY_OF_MONTH)
+        }
+
+        addText(
+            selectedCard,
+            "روز انتخاب‌شده",
+            17f,
+            green,
+            true
         )
 
-        dateCard.addView(
-            dateInfo,
-            LinearLayout.LayoutParams(0, -2, 1f)
+        addSpace(selectedCard, 8)
+
+        addText(
+            selectedCard,
+            "${fa(selected)} ${persianMonths[month]} ${fa(year)}",
+            21f,
+            gold,
+            true
         )
 
-        root.addView(dateCard, margins(0, 18))
+        addSpace(selectedCard, 8)
 
-        root.addView(
-            label("امکانات برنامه", 19f, green, true, Gravity.RIGHT)
-        )
-
-        addTwoCards(
-            root,
-            actionCard(
-                "📅", "تقویم شمسی",
-                "نمای ماهانه و انتخاب روز",
-                green
-            ) {
-                showCalendar()
+        addText(
+            selectedCard,
+            if (selectedDay == 0) {
+                "برای انتخاب روز، روی یکی از خانه‌های تقویم بزنید."
+            } else {
+                "روز ${fa(selectedDay)} انتخاب شده است."
             },
-            actionCard(
-                "🕌", "اوقات شرعی",
-                "اذان بر اساس موقعیت گوشی",
-                gold
-            ) {
-                showLiveInfo("prayer")
-            }
+            13f,
+            gray
         )
 
-        addTwoCards(
-            root,
-            actionCard(
-                "🌤️", "هواشناسی",
-                "پیش‌بینی هفت روز آینده",
-                blue
-            ) {
-                showLiveInfo("weather")
-            },
-            actionCard(
-                "🎮", "بازی کلمات",
-                "بخش بازی در حال ساخت",
-                red
-            ) {
-                Toast.makeText(
-                    this,
-                    "بازی هنوز پیاده‌سازی نشده است.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+        body.addView(
+            selectedCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         )
 
-        val info = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rounded(mint, 18)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+        addSpace(body, 12)
+
+        addButton(body, "بازگشت به ماه جاری") {
+            displayedMonth = newPersianCalendar()
+            selectedDay = 0
+            showCalendar()
         }
 
-        info.addView(
-            label(
-                "امکانات آنلاین",
-                15f, green, true, Gravity.RIGHT
-            )
-        )
-
-        info.addView(
-            label(
-                "برای دریافت اطلاعات آنلاین، اینترنت و موقعیت مکانی را فعال کنید.",
-                12f, gray, false, Gravity.RIGHT
-            )
-        )
-
-        root.addView(info, margins(14, 8))
-
-        root.addView(
-            label("ساخته شده با ❤️ توسط Pouyan", 11f, gray)
-        )
-
-        setContentView(scroll)
+        installPage(scroll, 1)
     }
 
-    // صفحه اوقات شرعی و هواشناسی
+    // ==============================
+    // صفحه سوم: اوقات شرعی
+    // ==============================
 
     private fun showLiveInfo(mode: String) {
         currentMode = mode
 
-        val (scroll, root) = page()
+        val pageIndex = if (mode == "prayer") 2 else 3
+        currentPage = pageIndex
 
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = gradient(green, green2)
-            setPadding(dp(15), dp(16), dp(15), dp(16))
-        }
-
-        header.addView(
-            label(
-                if (mode == "prayer") "🕌 اوقات شرعی" else "🌤️ هواشناسی",
-                23f, white, true
-            )
-        )
-
-        header.addView(
-            label("اطلاعات آنلاین بر اساس موقعیت گوشی", 12f, white)
-        )
-
-        root.addView(header, margins(0, 12))
-
-        val back = label(
-            "→ بازگشت به صفحه اصلی",
-            14f, green2, true, Gravity.RIGHT
-        )
-
-        back.setOnClickListener { showHome() }
-        root.addView(back)
-
-        liveStatus = label(
-            "در حال بررسی موقعیت مکانی...",
-            13f, gray, true
-        )
-
-        root.addView(liveStatus, margins(10, 10))
-
-        prayerBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        weatherBox = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        val (scroll, body) = makeScroll()
 
         if (mode == "prayer") {
-            root.addView(prayerBox)
+            addHeader(
+                body,
+                "اوقات شرعی",
+                "زمان‌بندی نمازها بر اساس موقعیت مکانی"
+            )
+
+            val locationCard = card(green, 18)
+
+            addText(
+                locationCard,
+                "موقعیت مکانی شما",
+                17f,
+                gold,
+                true
+            )
+
+            liveStatus = addText(
+                locationCard,
+                "در حال دریافت موقعیت مکانی...",
+                13f,
+                white
+            )
+
+            addSpace(locationCard, 10)
+
+            addButton(
+                locationCard,
+                "به‌روزرسانی موقعیت",
+                green2,
+                white
+            ) {
+                requestLocation()
+            }
+
+            body.addView(
+                locationCard,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            addSpace(body, 16)
+
+            addText(
+                body,
+                "برنامه نمازهای روزانه",
+                18f,
+                green,
+                true
+            )
+
+            addSpace(body, 10)
+
+            prayerBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            val loading = card(white)
+            addText(
+                loading,
+                "برای نمایش زمان نمازها، موقعیت مکانی و اطلاعات آنلاین دریافت می‌شود.",
+                14f,
+                gray
+            )
+
+            prayerBox?.addView(
+                loading,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            body.addView(
+                prayerBox,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
         } else {
-            root.addView(weatherBox)
+            addHeader(
+                body,
+                "هواشناسی",
+                "پیش‌بینی آنلاین وضعیت آب‌وهوا برای هفت روز"
+            )
+
+            val locationCard = card(green, 18)
+
+            addText(
+                locationCard,
+                "وضعیت موقعیت مکانی",
+                17f,
+                gold,
+                true
+            )
+
+            liveStatus = addText(
+                locationCard,
+                "در حال دریافت موقعیت...",
+                13f,
+                white
+            )
+
+            addButton(
+                locationCard,
+                "به‌روزرسانی هواشناسی",
+                green2,
+                white
+            ) {
+                requestLocation()
+            }
+
+            body.addView(
+                locationCard,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            addSpace(body, 16)
+
+            weatherBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            val loading = card(white)
+
+            addText(
+                loading,
+                "در انتظار دریافت اطلاعات هواشناسی...",
+                14f,
+                gray
+            )
+
+            weatherBox?.addView(
+                loading,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            body.addView(
+                weatherBox,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
         }
 
-        val refresh = actionCard(
-            "🔄", "به‌روزرسانی",
-            "دریافت دوباره اطلاعات", blue
-        ) {
-            requestLocation()
-        }
-
-        root.addView(refresh, margins(12, 8))
-
-        setContentView(scroll)
+        installPage(scroll, pageIndex)
         requestLocation()
     }
 
+    // ==============================
+    // دریافت مجوز مکان
+    // ==============================
+
     private fun requestLocation() {
-        val fine = checkSelfPermission(
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        val coarse = checkSelfPermission(
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!fine && !coarse) {
+        if (
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             requestPermissions(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
@@ -457,7 +1048,6 @@ class MainActivity : Activity() {
                 ),
                 permissionCode
             )
-            liveStatus.text = "لطفاً اجازه مکان‌یابی را تأیید کنید."
             return
         }
 
@@ -476,78 +1066,102 @@ class MainActivity : Activity() {
         )
 
         if (requestCode == permissionCode) {
-            val granted = grantResults.any {
-                it == PackageManager.PERMISSION_GRANTED
-            }
-
-            if (granted) {
+            if (grantResults.any {
+                    it == PackageManager.PERMISSION_GRANTED
+                }) {
                 findPhoneLocation()
             } else {
-                liveStatus.text = "اجازه دسترسی به مکان داده نشد."
+                liveStatus?.text =
+                    "مجوز مکان داده نشد. لطفاً دسترسی مکان را فعال کنید."
             }
         }
     }
 
+    // ==============================
+    // دریافت مختصات گوشی
+    // ==============================
+
     private fun findPhoneLocation() {
         try {
             locationManager =
-                getSystemService(LOCATION_SERVICE) as LocationManager
+                getSystemService(Context.LOCATION_SERVICE)
+                        as LocationManager
 
-            val manager = locationManager!!
-            val providers = manager.getProviders(true)
+            val manager = locationManager ?: return
 
-            if (providers.isEmpty()) {
-                liveStatus.text = "لطفاً GPS گوشی را روشن کنید."
-                return
-            }
+            var bestLocation: Location? = null
 
-            var last: Location? = null
-
-            for (provider in providers) {
-                val location = try {
-                    manager.getLastKnownLocation(provider)
-                } catch (_: Exception) {
-                    null
-                }
-
-                if (
-                    location != null &&
-                    (last == null || location.time > last.time)
-                ) {
-                    last = location
-                }
-            }
-
-            if (last != null) {
-                loadOnlineInformation(
-                    last.latitude,
-                    last.longitude
-                )
-                return
-            }
-
-            liveStatus.text = "در حال دریافت موقعیت گوشی..."
-
-            locationListener = object : LocationListener {
-                override fun onLocationChanged(location: Location) {
-                    stopLocationUpdates()
-
-                    loadOnlineInformation(
-                        location.latitude,
-                        location.longitude
-                    )
-                }
-            }
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER
+            )
 
             for (provider in providers) {
                 try {
-                    manager.requestLocationUpdates(
-                        provider,
-                        1000L,
-                        10f,
-                        locationListener!!,
-                        Looper.getMainLooper()
-                    )
+                    if (
+                        manager.isProviderEnabled(provider) &&
+                        checkSelfPermission(
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED ||
+                        manager.isProviderEnabled(provider) &&
+                        checkSelfPermission(
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        val location =
+                            manager.getLastKnownLocation(provider)
+
+                        if (
+                            location != null &&
+                            (
+                                bestLocation == null ||
+                                location.time > bestLocation!!.time
+                            )
+                        ) {
+                            bestLocation = location
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+
+            if (bestLocation != null) {
+                useLocation(bestLocation!!)
+                return
+            }
+
+            liveStatus?.text =
+                "در حال جست‌وجوی موقعیت فعلی گوشی..."
+
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    stopLocationUpdates()
+                    useLocation(location)
+                }
+            }
+
+            locationListener = listener
+
+            for (provider in providers) {
+                try {
+                    if (manager.isProviderEnabled(provider)) {
+                        if (
+                            checkSelfPermission(
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED ||
+                            checkSelfPermission(
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            manager.requestLocationUpdates(
+                                provider,
+                                3000L,
+                                10f,
+                                listener,
+                                Looper.getMainLooper()
+                            )
+                        }
+                    }
                 } catch (_: Exception) {
                 }
             }
@@ -555,14 +1169,30 @@ class MainActivity : Activity() {
             handler.postDelayed({
                 if (locationListener != null) {
                     stopLocationUpdates()
-                    liveStatus.text =
-                        "موقعیت دریافت نشد. GPS را بررسی کنید."
+                    liveStatus?.text =
+                        "موقعیت پیدا نشد. GPS و اینترنت را بررسی کنید."
                 }
-            }, 25000L)
+            }, 15000)
 
-        } catch (_: Exception) {
-            liveStatus.text = "خطا در دریافت موقعیت مکانی."
+        } catch (e: Exception) {
+            liveStatus?.text =
+                "خطا در دریافت موقعیت: ${e.message}"
         }
+    }
+
+    private fun useLocation(location: Location) {
+        if (isFinishing) return
+
+        liveStatus?.text =
+            "موقعیت دریافت شد\n" +
+            "عرض جغرافیایی: ${location.latitude}\n" +
+            "طول جغرافیایی: ${location.longitude}"
+
+        loadOnlineInformation(
+            location.latitude,
+            location.longitude,
+            currentMode
+        )
     }
 
     private fun stopLocationUpdates() {
@@ -574,518 +1204,169 @@ class MainActivity : Activity() {
         }
 
         locationListener = null
-    }
-
-    // دریافت اطلاعات آنلاین
-
-    private fun readUrl(address: String): String {
-        val connection =
-            URL(address).openConnection() as HttpURLConnection
-
-        try {
-            connection.requestMethod = "GET"
-            connection.connectTimeout = 15000
-            connection.readTimeout = 15000
-
-            if (connection.responseCode !in 200..299) {
-                throw Exception("Network error")
-            }
-
-            return connection.inputStream
-                .bufferedReader()
-                .use { it.readText() }
-
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun loadOnlineInformation(
-        latitude: Double,
-        longitude: Double
-    ) {
-        runOnUiThread {
-            liveStatus.text = "موقعیت پیدا شد؛ دریافت اطلاعات آنلاین..."
-        }
-
-        executor.execute {
-            try {
-                if (currentMode == "prayer") {
-                    val timestamp = System.currentTimeMillis() / 1000L
-
-                    val address =
-                        "https://api.aladhan.com/v1/timings/$timestamp" +
-                            "?latitude=$latitude&longitude=$longitude&method=7"
-
-                    val json = JSONObject(readUrl(address))
-                    val data = json.getJSONObject("data")
-                    val timings = data.getJSONObject("timings")
-
-                    val hijri = data.getJSONObject("date")
-                        .getJSONObject("hijri")
-
-                    val hijriDate =
-                        "${hijri.optString("day")} " +
-                            "${hijri.getJSONObject("month").optString("ar")} " +
-                            hijri.optString("year")
-
-                    runOnUiThread {
-                        displayPrayer(timings, hijriDate)
-                    }
-
-                } else {
-                    val address =
-                        "https://api.open-meteo.com/v1/forecast" +
-                            "?latitude=$latitude&longitude=$longitude" +
-                            "&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m" +
-                            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max" +
-                            "&forecast_days=7&timezone=auto"
-
-                    val json = JSONObject(readUrl(address))
-
-                    runOnUiThread {
-                        displayWeather(json)
-                    }
-                }
-
-            } catch (_: Exception) {
-                runOnUiThread {
-                    liveStatus.text =
-                        "دریافت اطلاعات ناموفق بود. اینترنت را بررسی کنید."
-                }
-            }
-        }
-    }
-
-    // نمایش اوقات شرعی
-
-    private fun displayPrayer(
-        timings: JSONObject,
-        hijriDate: String
-    ) {
-        prayerBox.removeAllViews()
-
-        liveStatus.text = "اوقات شرعی دریافت شد"
-
-        val items = listOf(
-            Triple("اذان صبح", "Fajr", "🌅"),
-            Triple("طلوع آفتاب", "Sunrise", "☀️"),
-            Triple("اذان ظهر", "Dhuhr", "🌞"),
-            Triple("اذان عصر", "Asr", "🌤️"),
-            Triple("غروب آفتاب", "Sunset", "🌇"),
-            Triple("اذان مغرب", "Maghrib", "🌆"),
-            Triple("اذان عشا", "Isha", "🌙")
-        )
-
-        val prayerTimes = items.map {
-            Triple(
-                it.first,
-                timings.optString(it.second, "--").take(5),
-                it.third
-            )
-        }
-
-        val now = java.util.Calendar.getInstance()
-        val currentMinutes =
-            now.get(java.util.Calendar.HOUR_OF_DAY) * 60 +
-                now.get(java.util.Calendar.MINUTE)
-
-        fun toMinutes(value: String): Int {
-            return try {
-                val parts = value.split(":")
-                parts[0].toInt() * 60 + parts[1].toInt()
-            } catch (_: Exception) {
-                -1
-            }
-        }
-
-        val prayerNames = listOf(
-            "اذان صبح", "اذان ظهر",
-            "اذان عصر", "اذان مغرب", "اذان عشا"
-        )
-
-        val upcoming = prayerNames.firstOrNull { name ->
-            val item = prayerTimes.first { it.first == name }
-            toMinutes(item.second) > currentMinutes
-        } ?: "اذان صبح"
-
-        val next = prayerTimes.first { it.first == upcoming }
-        val nextMinutes = toMinutes(next.second)
-
-        val remaining = if (nextMinutes >= 0) {
-            val difference = if (nextMinutes > currentMinutes) {
-                nextMinutes - currentMinutes
-            } else {
-                1440 - currentMinutes + nextMinutes
-            }
-
-            "${fa(difference / 60)} ساعت و ${fa(difference % 60)} دقیقه"
-        } else {
-            "نامشخص"
-        }
-
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = gradient(green, green2)
-            setPadding(dp(15), dp(18), dp(15), dp(18))
-        }
-
-        header.addView(label("نماز بعدی", 14f, white))
-        header.addView(label(next.third, 35f, white))
-        header.addView(label(next.first, 21f, white, true))
-        header.addView(
-            label(faText(next.second), 29f, gold, true)
-        )
-        header.addView(
-            label("زمان باقی‌مانده: $remaining", 12f, white)
-        )
-
-        prayerBox.addView(header, margins(5, 10))
-
-        prayerBox.addView(
-            label(
-                "تاریخ قمری: $hijriDate",
-                12f, gray, false, Gravity.RIGHT
-            )
-        )
-
-        prayerBox.addView(
-            label(
-                "برنامه کامل اوقات شرعی",
-                18f, green, true, Gravity.RIGHT
-            )
-        )
-
-        val grid = GridLayout(this).apply {
-            columnCount = 2
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-        }
-
-        for (item in prayerTimes) {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER
-                background = rounded(
-                    if (item.first == upcoming) {
-                        Color.rgb(255, 244, 218)
-                    } else {
-                        white
-                    },
-                    17
-                )
-                setPadding(dp(7), dp(10), dp(7), dp(10))
-                elevation = dp(2).toFloat()
-            }
-
-            card.addView(label(item.third, 27f))
-            card.addView(label(item.first, 14f, green, true))
-            card.addView(
-                label(faText(item.second), 20f, green2, true)
-            )
-
-            val params = GridLayout.LayoutParams().apply {
-                width = 0
-                height = dp(120)
-                columnSpec = GridLayout.spec(
-                    GridLayout.UNDEFINED, 1f
-                )
-                setMargins(dp(4), dp(4), dp(4), dp(4))
-            }
-
-            grid.addView(card, params)
-        }
-
-        prayerBox.addView(grid)
-    }
-
-    // نمایش هواشناسی هفت روزه
-
-    private fun weatherIcon(code: Int): String {
-        return when (code) {
-            0 -> "☀️"
-            1, 2 -> "🌤️"
-            3 -> "☁️"
-            45, 48 -> "🌫️"
-            in 51..67 -> "🌧️"
-            in 71..77 -> "❄️"
-            in 80..82 -> "🌦️"
-            in 95..99 -> "⛈️"
-            else -> "🌤️"
-        }
-    }
-
-    private fun weatherDescription(code: Int): String {
-        return when (code) {
-            0 -> "آفتابی"
-            1, 2 -> "نیمه ابری"
-            3 -> "ابری"
-            45, 48 -> "مه‌آلود"
-            in 51..67 -> "بارانی"
-            in 71..77 -> "برفی"
-            in 80..82 -> "رگبار"
-            in 95..99 -> "طوفانی"
-            else -> "متغیر"
-        }
-    }
-
-    private fun displayWeather(json: JSONObject) {
-        weatherBox.removeAllViews()
-
-        liveStatus.text = "هواشناسی دریافت شد"
-
-        val current = json.getJSONObject("current")
-        val daily = json.getJSONObject("daily")
-
-        val temperature = current.optDouble("temperature_2m", 0.0)
-        val humidity = current.optInt("relative_humidity_2m", 0)
-        val wind = current.optDouble("wind_speed_10m", 0.0)
-        val code = current.optInt("weather_code", 0)
-
-        val currentCard = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            background = gradient(blue, Color.rgb(100, 165, 205))
-            setPadding(dp(15), dp(18), dp(15), dp(18))
-            elevation = dp(3).toFloat()
-        }
-
-        currentCard.addView(
-            label("وضعیت فعلی هوا", 17f, white, true)
-        )
-
-        currentCard.addView(
-            label(weatherIcon(code), 48f, white)
-        )
-
-        currentCard.addView(
-            label(
-                "${faText(String.format(Locale.US, "%.1f", temperature))}°",
-                40f, white, true
-            )
-        )
-
-        currentCard.addView(
-            label(weatherDescription(code), 17f, white, true)
-        )
-
-        currentCard.addView(
-            label(
-                "رطوبت: ${fa(humidity)}٪   باد: ${fa(wind.toInt())} کیلومتر بر ساعت",
-                12f, white
-            )
-        )
-
-        weatherBox.addView(currentCard, margins(5, 12))
-
-        weatherBox.addView(
-            label(
-                "پیش‌بینی هفت روز آینده",
-                19f, green, true, Gravity.RIGHT
-            )
-        )
-
-        val dates = daily.getJSONArray("time")
-        val maximum = daily.getJSONArray("temperature_2m_max")
-        val minimum = daily.getJSONArray("temperature_2m_min")
-        val codes = daily.getJSONArray("weather_code")
-        val rain = daily.getJSONArray(
-            "precipitation_probability_max"
-        )
-
-        for (i in 0 until dates.length()) {
-            val date = dates.getString(i)
-            val shortDate = if (date.length >= 10) {
-                date.substring(5, 10)
-            } else {
-                date
-            }
-
-            val dayCode = codes.getInt(i)
-
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                background = rounded(white, 16)
-                elevation = dp(1).toFloat()
-                setPadding(dp(7), dp(10), dp(7), dp(10))
-            }
-
-            row.addView(
-                label(
-                    if (i == 0) "امروز" else faText(shortDate),
-                    12f, green, true
-                ),
-                LinearLayout.LayoutParams(0, -2, 1f)
-            )
-
-            row.addView(
-                label(weatherIcon(dayCode), 24f),
-                LinearLayout.LayoutParams(dp(45), -2)
-            )
-
-            row.addView(
-                label(
-                    "${fa(maximum.getInt(i))}° / ${fa(minimum.getInt(i))}°",
-                    13f, green2, true
-                ),
-                LinearLayout.LayoutParams(0, -2, 1f)
-            )
-
-            row.addView(
-                label(
-                    "💧${fa(rain.getInt(i))}٪",
-                    11f, blue
-                ),
-                LinearLayout.LayoutParams(dp(58), -2)
-            )
-
-            weatherBox.addView(row, margins(4, 5))
-        }
-    }
-
-    // تقویم شمسی
+    }    // ==============================
+    // صفحه دوم: تقویم شمسی
+    // ==============================
 
     private fun showCalendar() {
-        val (scroll, root) = page()
+        currentPage = 1
 
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = gradient(green, green2)
-            setPadding(dp(15), dp(16), dp(15), dp(16))
+        val (scroll, body) = makeScroll()
+
+        addHeader(
+            body,
+            "تقویم شمسی",
+            "نمایش ماه‌ها و انتخاب روزهای سال"
+        )
+
+        val calendar = displayedMonth.clone() as Calendar
+
+        val year = calendar.get(Calendar.YEAR)
+        val month = calendar.get(Calendar.MONTH)
+        val today = newPersianCalendar()
+
+        val monthCard = card(green, 16)
+
+        val monthTitle = TextView(this).apply {
+            text = "${persianMonths[month]} ${fa(year)}"
+            textSize = 23f
+            setTextColor(gold)
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
         }
 
-        header.addView(
-            label("📅 تقویم شمسی", 23f, white, true)
+        monthCard.addView(
+            monthTitle,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(48)
+            )
         )
 
-        header.addView(
-            label("تقویم ماهانه فارسی", 12f, white)
-        )
-
-        root.addView(header, margins(0, 12))
-
-        val back = label(
-            "→ بازگشت به صفحه اصلی",
-            14f, green2, true, Gravity.RIGHT
-        )
-
-        back.setOnClickListener { showHome() }
-        root.addView(back)
-
-        val monthBar = LinearLayout(this).apply {
+        val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = rounded(white, 18)
-            setPadding(dp(5), dp(7), dp(5), dp(7))
         }
 
-        val previous = label("❮", 20f, green, true)
-        previous.setOnClickListener {
-            displayedMonth.add(Calendar.MONTH, -1)
-            selectedDay = 1
-            showCalendar()
+        val previousMonth = TextView(this).apply {
+            text = "❮ ماه قبل"
+            textSize = 14f
+            setTextColor(white)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener {
+                displayedMonth.add(Calendar.MONTH, -1)
+                selectedDay = 0
+                showCalendar()
+            }
         }
 
-        val next = label("❯", 20f, green, true)
-        next.setOnClickListener {
-            displayedMonth.add(Calendar.MONTH, 1)
-            selectedDay = 1
-            showCalendar()
+        val nextMonth = TextView(this).apply {
+            text = "ماه بعد ❯"
+            textSize = 14f
+            setTextColor(white)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setOnClickListener {
+                displayedMonth.add(Calendar.MONTH, 1)
+                selectedDay = 0
+                showCalendar()
+            }
         }
 
-        val title = label(
-            "${months[displayedMonth.get(Calendar.MONTH)]} " +
-                fa(displayedMonth.get(Calendar.YEAR)),
-            18f, green, true
-        )
-
-        monthBar.addView(
-            previous,
-            LinearLayout.LayoutParams(dp(45), dp(45))
-        )
-
-        monthBar.addView(
-            title,
+        controls.addView(
+            previousMonth,
             LinearLayout.LayoutParams(0, dp(45), 1f)
         )
 
-        monthBar.addView(
-            next,
-            LinearLayout.LayoutParams(dp(45), dp(45))
+        controls.addView(
+            nextMonth,
+            LinearLayout.LayoutParams(0, dp(45), 1f)
         )
 
-        root.addView(monthBar, margins(8, 12))
+        monthCard.addView(controls)
 
         val grid = GridLayout(this).apply {
             columnCount = 7
-            layoutDirection = View.LAYOUT_DIRECTION_RTL
-            background = rounded(white, 18)
-            setPadding(dp(4), dp(8), dp(4), dp(8))
+            rowCount = 7
+            alignmentMode = GridLayout.ALIGN_BOUNDS
+            useDefaultMargins = false
         }
 
-        for (day in weekdays) {
+        val headers = arrayOf(
+            "ش", "ی", "د", "س", "چ", "پ", "ج"
+        )
+
+        for (dayName in headers) {
+            val cell = TextView(this).apply {
+                text = dayName
+                textSize = 14f
+                setTextColor(gold)
+                gravity = Gravity.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+            }
+
             grid.addView(
-                label(day.take(1), 12f, green2, true),
+                cell,
                 GridLayout.LayoutParams().apply {
                     width = 0
-                    height = dp(38)
+                    height = dp(42)
                     columnSpec = GridLayout.spec(
-                        GridLayout.UNDEFINED, 1f
+                        GridLayout.UNDEFINED,
+                        1f
                     )
                 }
             )
         }
 
-        val first = newPersianCalendar().apply {
-            timeInMillis = displayedMonth.timeInMillis
-            set(Calendar.DAY_OF_MONTH, 1)
-        }
+        val firstDay = calendar.clone() as Calendar
+        firstDay.set(Calendar.DAY_OF_MONTH, 1)
 
-        val offset = first.get(Calendar.DAY_OF_WEEK) % 7
-        val totalDays =
-            first.getActualMaximum(Calendar.DAY_OF_MONTH)
+        // شروع هفته از شنبه
+        val offset = firstDay.get(Calendar.DAY_OF_WEEK) % 7
+        val maxDays = firstDay.getActualMaximum(
+            Calendar.DAY_OF_MONTH
+        )
 
-        repeat(offset) {
+        for (i in 0 until offset) {
+            val empty = TextView(this)
             grid.addView(
-                View(this),
+                empty,
                 GridLayout.LayoutParams().apply {
                     width = 0
                     height = dp(46)
                     columnSpec = GridLayout.spec(
-                        GridLayout.UNDEFINED, 1f
+                        GridLayout.UNDEFINED,
+                        1f
                     )
                 }
             )
         }
 
-        val today = newPersianCalendar().apply {
-            timeInMillis = System.currentTimeMillis()
-        }
-
-        for (day in 1..totalDays) {
+        for (day in 1..maxDays) {
             val isToday =
-                day == today.get(Calendar.DAY_OF_MONTH) &&
-                    displayedMonth.get(Calendar.MONTH) ==
-                    today.get(Calendar.MONTH) &&
-                    displayedMonth.get(Calendar.YEAR) ==
-                    today.get(Calendar.YEAR)
+                year == today.get(Calendar.YEAR) &&
+                month == today.get(Calendar.MONTH) &&
+                day == today.get(Calendar.DAY_OF_MONTH)
 
-            val isSelected = day == selectedDay
+            val isSelected = selectedDay == day
 
             val cell = TextView(this).apply {
                 text = fa(day)
-                textSize = 14f
+                textSize = 15f
                 gravity = Gravity.CENTER
-
                 setTextColor(
-                    if (isSelected || isToday) white else green
+                    when {
+                        isSelected -> white
+                        isToday -> gold
+                        else -> black
+                    }
                 )
 
                 background = rounded(
                     when {
                         isSelected -> green2
-                        isToday -> gold
+                        isToday -> green
                         else -> Color.TRANSPARENT
                     },
                     12
@@ -1103,46 +1384,434 @@ class MainActivity : Activity() {
                     width = 0
                     height = dp(46)
                     columnSpec = GridLayout.spec(
-                        GridLayout.UNDEFINED, 1f
+                        GridLayout.UNDEFINED,
+                        1f
                     )
                     setMargins(dp(2), dp(2), dp(2), dp(2))
                 }
             )
         }
 
-        root.addView(grid, margins(5, 12))
+        monthCard.addView(
+            grid,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
 
-        val selectedInfo = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rounded(mint, 18)
-            setPadding(dp(14), dp(12), dp(14), dp(12))
+        body.addView(
+            monthCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        addSpace(body, 16)
+
+        val selectedCard = card(white)
+
+        val selected = if (selectedDay > 0) {
+            selectedDay
+        } else {
+            today.get(Calendar.DAY_OF_MONTH)
         }
 
-        selectedInfo.addView(
-            label(
-                "روز انتخاب‌شده",
-                13f, gray, true, Gravity.RIGHT
+        addText(
+            selectedCard,
+            "روز انتخاب‌شده",
+            17f,
+            green,
+            true
+        )
+
+        addSpace(selectedCard, 8)
+
+        addText(
+            selectedCard,
+            "${fa(selected)} ${persianMonths[month]} ${fa(year)}",
+            21f,
+            gold,
+            true
+        )
+
+        addSpace(selectedCard, 8)
+
+        addText(
+            selectedCard,
+            if (selectedDay == 0) {
+                "برای انتخاب روز، روی یکی از خانه‌های تقویم بزنید."
+            } else {
+                "روز ${fa(selectedDay)} انتخاب شده است."
+            },
+            13f,
+            gray
+        )
+
+        body.addView(
+            selectedCard,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
 
-        selectedInfo.addView(
-            label(
-                "${fa(selectedDay)} " +
-                    "${months[displayedMonth.get(Calendar.MONTH)]} " +
-                    fa(displayedMonth.get(Calendar.YEAR)),
-                20f, green, true, Gravity.RIGHT
+        addSpace(body, 12)
+
+        addButton(body, "بازگشت به ماه جاری") {
+            displayedMonth = newPersianCalendar()
+            selectedDay = 0
+            showCalendar()
+        }
+
+        installPage(scroll, 1)
+    }
+
+    // ==============================
+    // صفحه سوم: اوقات شرعی
+    // ==============================
+
+    private fun showLiveInfo(mode: String) {
+        currentMode = mode
+
+        val pageIndex = if (mode == "prayer") 2 else 3
+        currentPage = pageIndex
+
+        val (scroll, body) = makeScroll()
+
+        if (mode == "prayer") {
+            addHeader(
+                body,
+                "اوقات شرعی",
+                "زمان‌بندی نمازها بر اساس موقعیت مکانی"
             )
+
+            val locationCard = card(green, 18)
+
+            addText(
+                locationCard,
+                "موقعیت مکانی شما",
+                17f,
+                gold,
+                true
+            )
+
+            liveStatus = addText(
+                locationCard,
+                "در حال دریافت موقعیت مکانی...",
+                13f,
+                white
+            )
+
+            addSpace(locationCard, 10)
+
+            addButton(
+                locationCard,
+                "به‌روزرسانی موقعیت",
+                green2,
+                white
+            ) {
+                requestLocation()
+            }
+
+            body.addView(
+                locationCard,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            addSpace(body, 16)
+
+            addText(
+                body,
+                "برنامه نمازهای روزانه",
+                18f,
+                green,
+                true
+            )
+
+            addSpace(body, 10)
+
+            prayerBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            val loading = card(white)
+            addText(
+                loading,
+                "برای نمایش زمان نمازها، موقعیت مکانی و اطلاعات آنلاین دریافت می‌شود.",
+                14f,
+                gray
+            )
+
+            prayerBox?.addView(
+                loading,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            body.addView(
+                prayerBox,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+        } else {
+            addHeader(
+                body,
+                "هواشناسی",
+                "پیش‌بینی آنلاین وضعیت آب‌وهوا برای هفت روز"
+            )
+
+            val locationCard = card(green, 18)
+
+            addText(
+                locationCard,
+                "وضعیت موقعیت مکانی",
+                17f,
+                gold,
+                true
+            )
+
+            liveStatus = addText(
+                locationCard,
+                "در حال دریافت موقعیت...",
+                13f,
+                white
+            )
+
+            addButton(
+                locationCard,
+                "به‌روزرسانی هواشناسی",
+                green2,
+                white
+            ) {
+                requestLocation()
+            }
+
+            body.addView(
+                locationCard,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            addSpace(body, 16)
+
+            weatherBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            val loading = card(white)
+
+            addText(
+                loading,
+                "در انتظار دریافت اطلاعات هواشناسی...",
+                14f,
+                gray
+            )
+
+            weatherBox?.addView(
+                loading,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+
+            body.addView(
+                weatherBox,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        installPage(scroll, pageIndex)
+        requestLocation()
+    }
+
+    // ==============================
+    // دریافت مجوز مکان
+    // ==============================
+
+    private fun requestLocation() {
+        if (
+            checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED &&
+            checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                permissionCode
+            )
+            return
+        }
+
+        findPhoneLocation()
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(
+            requestCode,
+            permissions,
+            grantResults
         )
 
-        root.addView(selectedInfo, margins(5, 10))
-
-        setContentView(scroll)
+        if (requestCode == permissionCode) {
+            if (grantResults.any {
+                    it == PackageManager.PERMISSION_GRANTED
+                }) {
+                findPhoneLocation()
+            } else {
+                liveStatus?.text =
+                    "مجوز مکان داده نشد. لطفاً دسترسی مکان را فعال کنید."
+            }
+        }
     }
 
-    override fun onDestroy() {
-        stopLocationUpdates()
-        executor.shutdownNow()
-        handler.removeCallbacksAndMessages(null)
-        super.onDestroy()
+    // ==============================
+    // دریافت مختصات گوشی
+    // ==============================
+
+    private fun findPhoneLocation() {
+        try {
+            locationManager =
+                getSystemService(Context.LOCATION_SERVICE)
+                        as LocationManager
+
+            val manager = locationManager ?: return
+
+            var bestLocation: Location? = null
+
+            val providers = listOf(
+                LocationManager.GPS_PROVIDER,
+                LocationManager.NETWORK_PROVIDER
+            )
+
+            for (provider in providers) {
+                try {
+                    if (
+                        manager.isProviderEnabled(provider) &&
+                        checkSelfPermission(
+                            Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED ||
+                        manager.isProviderEnabled(provider) &&
+                        checkSelfPermission(
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == PackageManager.PERMISSION_GRANTED
+                    ) {
+                        val location =
+                            manager.getLastKnownLocation(provider)
+
+                        if (
+                            location != null &&
+                            (
+                                bestLocation == null ||
+                                location.time > bestLocation!!.time
+                            )
+                        ) {
+                            bestLocation = location
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+
+            if (bestLocation != null) {
+                useLocation(bestLocation!!)
+                return
+            }
+
+            liveStatus?.text =
+                "در حال جست‌وجوی موقعیت فعلی گوشی..."
+
+            val listener = object : LocationListener {
+                override fun onLocationChanged(location: Location) {
+                    stopLocationUpdates()
+                    useLocation(location)
+                }
+            }
+
+            locationListener = listener
+
+            for (provider in providers) {
+                try {
+                    if (manager.isProviderEnabled(provider)) {
+                        if (
+                            checkSelfPermission(
+                                Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED ||
+                            checkSelfPermission(
+                                Manifest.permission.ACCESS_COARSE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                        ) {
+                            manager.requestLocationUpdates(
+                                provider,
+                                3000L,
+                                10f,
+                                listener,
+                                Looper.getMainLooper()
+                            )
+                        }
+                    }
+                } catch (_: Exception) {
+                }
+            }
+
+            handler.postDelayed({
+                if (locationListener != null) {
+                    stopLocationUpdates()
+                    liveStatus?.text =
+                        "موقعیت پیدا نشد. GPS و اینترنت را بررسی کنید."
+                }
+            }, 15000)
+
+        } catch (e: Exception) {
+            liveStatus?.text =
+                "خطا در دریافت موقعیت: ${e.message}"
+        }
     }
-}
+
+    private fun useLocation(location: Location) {
+        if (isFinishing) return
+
+        liveStatus?.text =
+            "موقعیت دریافت شد\n" +
+            "عرض جغرافیایی: ${location.latitude}\n" +
+            "طول جغرافیایی: ${location.longitude}"
+
+        loadOnlineInformation(
+            location.latitude,
+            location.longitude,
+            currentMode
+        )
+    }
+
+    private fun stopLocationUpdates() {
+        try {
+            locationListener?.let {
+                locationManager?.removeUpdates(it)
+            }
+        } catch (_: Exception) {
+        }
+
+        locationListener = null
+    }
