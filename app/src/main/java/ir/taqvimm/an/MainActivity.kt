@@ -1275,11 +1275,6 @@ private fun toGregorian(
 }
 
 
-        
-            g.get(Calendar.DAY_OF_MONTH)
-        )
-    }
-
     private fun jalaliDate(
         calendar: Calendar
     ): String {
@@ -1292,6 +1287,7 @@ private fun toGregorian(
 
         return "${j[0]}/${j[1]} ${j[2]}"
     }
+
 
     private fun weekday(
         calendar: Calendar
