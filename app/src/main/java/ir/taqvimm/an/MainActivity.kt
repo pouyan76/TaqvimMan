@@ -265,20 +265,22 @@ class MainActivity : Activity() {
         }
 
         val scroll = ScrollView(this).apply {
-            isFillViewport = true
-            isVerticalScrollBarEnabled = false
+    isFillViewport = true
+    isVerticalScrollBarEnabled = false
 
-            addView(
-                body,
-                ScrollView.LayoutParams(-1, -2)
-            )
-        }
+    addView(
+        body,
+        LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+    )
+}
 
-        return Pair(scroll, body)
-    }
+return Pair(scroll, body)
+}
 
-    private fun newPage(): Pair<ScrollView, LinearLayout> {
-
+private fun newPage(): Pair<ScrollView, LinearLayout> {
         val pair = makeScroll()
 
         pageContainer().removeAllViews()
