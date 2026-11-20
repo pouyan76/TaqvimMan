@@ -1,3 +1,4 @@
+
 package ir.taqvimm.an
 
 import android.Manifest
@@ -10,15 +11,13 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.GridLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -47,12 +46,9 @@ class MainActivity : Activity() {
 
     private var locationManager: LocationManager? = null
     private var currentLocation: Location? = null
-
-    private val handler = Handler(Looper.getMainLooper())
-
     private var prayerData: JSONObject? = null
-    private var weatherText = "در حال دریافت اطلاعات هواشناسی..."
 
+    private var weatherText = "در حال دریافت اطلاعات هواشناسی..."
     private var currentPage = "home"
     private var secretNumber = Random.nextInt(1, 101)
 
@@ -61,7 +57,6 @@ class MainActivity : Activity() {
 
         window.statusBarColor = darkGreen
         window.navigationBarColor = darkGreen
-        window.decorView.systemUiVisibility = 0
 
         createMainLayout()
         showHome()
@@ -118,7 +113,8 @@ class MainActivity : Activity() {
             setOnClickListener { onClick() }
         }
     }
-        private fun createMainLayout() {
+
+    private fun createMainLayout() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(darkGreen)
@@ -157,6 +153,7 @@ class MainActivity : Activity() {
                 layoutParams = LinearLayout.LayoutParams(
                     0, dp(55), 1f
                 )
+
                 setOnClickListener {
                     when (item.second) {
                         "home" -> showHome()
@@ -167,6 +164,7 @@ class MainActivity : Activity() {
                     }
                 }
             }
+
             navigation.addView(button)
         }
 
@@ -178,14 +176,6 @@ class MainActivity : Activity() {
         )
 
         setContentView(root)
-    }
-
-    private fun showPage(view: View) {
-        content.removeAllViews()
-        content.addView(
-            view,
-            FrameLayout.LayoutParams(-1, -1)
-        )
     }
 
     private fun createScroll(): LinearLayout {
@@ -212,16 +202,18 @@ class MainActivity : Activity() {
         return body
     }
 
+    // هدر مسجد طلایی
     private fun addHeader(body: LinearLayout) {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(12), dp(22), dp(12), dp(22))
+            setPadding(dp(10), dp(12), dp(10), dp(18))
             background = createBackground(emerald, 22, gold)
         }
 
         header.addView(
-            makeText("☪", 34f, gold, true)
+            MosqueHeaderView(),
+            LinearLayout.LayoutParams(-1, dp(145))
         )
 
         header.addView(
@@ -282,17 +274,9 @@ class MainActivity : Activity() {
             setOnClickListener { action() }
         }
 
-        card.addView(
-            makeText(icon, 30f, gold, true)
-        )
-
-        card.addView(
-            makeText(title, 16f, lightGold, true)
-        )
-
-        card.addView(
-            makeText(description, 11f, muted)
-        )
+        card.addView(makeText(icon, 30f, gold, true))
+        card.addView(makeText(title, 16f, lightGold, true))
+        card.addView(makeText(description, 11f, muted))
 
         val params = LinearLayout.LayoutParams(
             0,
@@ -301,18 +285,18 @@ class MainActivity : Activity() {
         )
 
         params.setMargins(dp(5), dp(5), dp(5), dp(5))
-
         body.addView(card, params)
     }
-        private fun showHome() {
+
+    private fun showHome() {
         currentPage = "home"
         val body = createScroll()
 
         addHeader(body)
-
         addSectionTitle(body, "تقویم امروز")
 
         val today = Calendar.getInstance()
+
         val dateText = getPersianDate(
             today.get(Calendar.YEAR),
             today.get(Calendar.MONTH) + 1,
@@ -396,12 +380,10 @@ class MainActivity : Activity() {
 
         addSectionTitle(body, "امکانات تقویم")
 
-        val calendarButton = makeButton("مشاهده تقویم شمسی") {
-            showCalendar()
-        }
-
         body.addView(
-            calendarButton,
+            makeButton("مشاهده تقویم شمسی") {
+                showCalendar()
+            },
             LinearLayout.LayoutParams(-1, dp(52)).apply {
                 topMargin = dp(8)
             }
@@ -463,9 +445,7 @@ class MainActivity : Activity() {
             )
         }
 
-        val daysInMonth = 31
-
-        for (i in 1..daysInMonth) {
+        for (i in 1..31) {
             val text = makeText(
                 i.toString(),
                 14f,
@@ -504,14 +484,16 @@ class MainActivity : Activity() {
         addHeader(body)
         addSectionTitle(body, "اوقات شرعی")
 
+        val timings = prayerData
+
         val prayers = listOf(
-            "اذان صبح" to "05:00",
-            "طلوع آفتاب" to "06:25",
-            "اذان ظهر" to "12:10",
-            "اذان عصر" to "15:30",
-            "غروب آفتاب" to "17:45",
-            "اذان مغرب" to "18:05",
-            "اذان عشا" to "19:00"
+            "اذان صبح" to (timings?.optString("Fajr") ?: "دریافت نشده"),
+            "طلوع آفتاب" to (timings?.optString("Sunrise") ?: "دریافت نشده"),
+            "اذان ظهر" to (timings?.optString("Dhuhr") ?: "دریافت نشده"),
+            "اذان عصر" to (timings?.optString("Asr") ?: "دریافت نشده"),
+            "غروب آفتاب" to (timings?.optString("Sunset") ?: "دریافت نشده"),
+            "اذان مغرب" to (timings?.optString("Maghrib") ?: "دریافت نشده"),
+            "اذان عشا" to (timings?.optString("Isha") ?: "دریافت نشده")
         )
 
         prayers.forEach { prayer ->
@@ -549,7 +531,7 @@ class MainActivity : Activity() {
 
             card.addView(
                 time,
-                LinearLayout.LayoutParams(dp(100), dp(48))
+                LinearLayout.LayoutParams(dp(120), dp(48))
             )
 
             body.addView(
@@ -568,7 +550,8 @@ class MainActivity : Activity() {
             )
         )
     }
-        private fun showWeather() {
+
+    private fun showWeather() {
         currentPage = "weather"
         val body = createScroll()
 
@@ -710,17 +693,19 @@ class MainActivity : Activity() {
                         object : LocationListener {
                             override fun onLocationChanged(location: Location) {
                                 currentLocation = location
+
                                 loadWeather(
                                     location.latitude,
                                     location.longitude
                                 )
+
                                 loadPrayerTimes(
                                     location.latitude,
                                     location.longitude
                                 )
                             }
                         },
-                        Looper.getMainLooper()
+                        android.os.Looper.getMainLooper()
                     )
                 }
             }
@@ -755,14 +740,20 @@ class MainActivity : Activity() {
 
                 runOnUiThread {
                     weatherText = "دمای فعلی: $temperature درجه"
-                    if (currentPage == "weather") showWeather()
+
+                    if (currentPage == "weather") {
+                        showWeather()
+                    }
                 }
 
                 connection.disconnect()
             } catch (e: Exception) {
                 runOnUiThread {
                     weatherText = "دریافت هواشناسی ناموفق بود"
-                    if (currentPage == "weather") showWeather()
+
+                    if (currentPage == "weather") {
+                        showWeather()
+                    }
                 }
             }
         }
@@ -795,6 +786,10 @@ class MainActivity : Activity() {
 
                 runOnUiThread {
                     prayerData = timings
+
+                    if (currentPage == "prayer") {
+                        showPrayer()
+                    }
                 }
 
                 connection.disconnect()
@@ -855,13 +850,161 @@ class MainActivity : Activity() {
         return "$jd / $jm / $jy"
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        handler.removeCallbacksAndMessages(null)
+    // رسم مسجد، گنبد، مناره، ماه و ستاره
+    private inner class MosqueHeaderView : View(this@MainActivity) {
 
-        try {
-            locationManager?.removeUpdates { }
-        } catch (_: Exception) {
+        private val paint = android.graphics.Paint(
+            android.graphics.Paint.ANTI_ALIAS_FLAG
+        )
+
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            super.onDraw(canvas)
+
+            val w = width.toFloat()
+            val h = height.toFloat()
+            val cx = w / 2f
+
+            paint.style = android.graphics.Paint.Style.FILL
+
+            // پس زمینه
+            paint.color = darkGreen
+
+            canvas.drawRoundRect(
+                0f, 0f, w, h,
+                dp(18).toFloat(),
+                dp(18).toFloat(),
+                paint
+            )
+
+            // ستاره‌ها
+            paint.color = gold
+
+            val stars = listOf(
+                0.15f to 0.18f,
+                0.30f to 0.12f,
+                0.70f to 0.15f,
+                0.85f to 0.25f,
+                0.20f to 0.40f,
+                0.78f to 0.42f
+            )
+
+            stars.forEach {
+                canvas.drawCircle(
+                    w * it.first,
+                    h * it.second,
+                    dp(2).toFloat(),
+                    paint
+                )
+            }
+
+            // ماه
+            paint.color = gold
+
+            canvas.drawCircle(
+                w * 0.78f,
+                h * 0.22f,
+                dp(15).toFloat(),
+                paint
+            )
+
+            paint.color = darkGreen
+
+            canvas.drawCircle(
+                w * 0.82f,
+                h * 0.17f,
+                dp(13).toFloat(),
+                paint
+            )
+
+            // بدنه مسجد
+            paint.color = gold
+
+            canvas.drawRect(
+                w * 0.28f,
+                h * 0.58f,
+                w * 0.72f,
+                h * 0.85f,
+                paint
+            )
+
+            // گنبد اصلی
+            val dome = android.graphics.Path().apply {
+                moveTo(w * 0.28f, h * 0.60f)
+                quadTo(
+                    cx,
+                    h * 0.08f,
+                    w * 0.72f,
+                    h * 0.60f
+                )
+                close()
+            }
+
+            canvas.drawPath(dome, paint)
+
+            // گنبد کوچک
+            canvas.drawOval(
+                w * 0.43f,
+                h * 0.40f,
+                w * 0.57f,
+                h * 0.58f,
+                paint
+            )
+
+            // مناره چپ
+            canvas.drawRect(
+                w * 0.19f,
+                h * 0.34f,
+                w * 0.24f,
+                h * 0.85f,
+                paint
+            )
+
+            canvas.drawCircle(
+                w * 0.215f,
+                h * 0.32f,
+                dp(5).toFloat(),
+                paint
+            )
+
+            // مناره راست
+            canvas.drawRect(
+                w * 0.76f,
+                h * 0.34f,
+                w * 0.81f,
+                h * 0.85f,
+                paint
+            )
+
+            canvas.drawCircle(
+                w * 0.785f,
+                h * 0.32f,
+                dp(5).toFloat(),
+                paint
+            )
+
+            // در ورودی
+            paint.color = darkGreen
+
+            canvas.drawRoundRect(
+                w * 0.45f,
+                h * 0.65f,
+                w * 0.55f,
+                h * 0.85f,
+                dp(25).toFloat(),
+                dp(25).toFloat(),
+                paint
+            )
+
+            // خط طلایی
+            paint.color = gold
+
+            canvas.drawRect(
+                w * 0.12f,
+                h * 0.88f,
+                w * 0.88f,
+                h * 0.895f,
+                paint
+            )
         }
     }
 }
