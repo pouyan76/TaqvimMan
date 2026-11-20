@@ -2,9 +2,10 @@
 name: Build Android APK
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -12,50 +13,25 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
+      - name: Set up JDK
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android SDK packages
-        run: |
-          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          if [ -z "$SDKMANAGER" ]; then
-            echo "sdkmanager not found"
-            exit 1
-          fi
-          yes | "$SDKMANAGER" --licenses || true
-          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.9'
-
-      - name: Validate Android Manifest
-        run: |
-          python3 - <<'PY'
-          import xml.etree.ElementTree as ET
-
-          path = "app/src/main/AndroidManifest.xml"
-
-          try:
-              ET.parse(path)
-              print("AndroidManifest.xml is valid XML")
-          except Exception as error:
-              print("MANIFEST XML ERROR:")
-              print(error)
-              raise SystemExit(1)
-          PY
-
       - name: Build APK
-        run: gradle --no-daemon --stacktrace --info :app:assembleDebug
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make APK
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TaqvimMan-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: TaqvimYar-Plus-APK
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
