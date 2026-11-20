@@ -10,6 +10,8 @@ import android.graphics.drawable.GradientDrawable
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -17,7 +19,6 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.GridLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -51,6 +52,14 @@ class MainActivity : Activity() {
     private var weatherText = "در حال دریافت اطلاعات هواشناسی..."
     private var currentPage = "home"
     private var secretNumber = Random.nextInt(1, 101)
+
+    // پخش آنلاین اذان
+    private var adhanPlayer: MediaPlayer? = null
+    private var adhanStatus = "برای پخش اذان دکمه پخش را بزنید"
+    private var adhanStatusView: TextView? = null
+
+    private val adhanUrl =
+        "https://dl.namaz.ir/s/c/other/azan/rahim_moazenzadeh.mp3"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -477,6 +486,7 @@ class MainActivity : Activity() {
         )
     }
 
+    // صفحه اوقات شرعی و پخش اذان
     private fun showPrayer() {
         currentPage = "prayer"
         val body = createScroll()
@@ -542,6 +552,78 @@ class MainActivity : Activity() {
             )
         }
 
+        addSectionTitle(body, "پخش اذان ایرانی")
+
+        val audioCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            setPadding(dp(16), dp(18), dp(16), dp(18))
+            background = createBackground(
+                emerald,
+                20,
+                gold
+            )
+        }
+
+        audioCard.addView(
+            makeText("☪", 42f, gold, true)
+        )
+
+        audioCard.addView(
+            makeText(
+                "اذان مرحوم رحیم مؤذن‌زاده اردبیلی",
+                17f,
+                lightGold,
+                true
+            )
+        )
+
+        audioCard.addView(
+            makeText(
+                "پخش آنلاین اذان معروف ایرانی",
+                12f,
+                muted
+            )
+        )
+
+        adhanStatusView = makeText(
+            adhanStatus,
+            13f,
+            lightGold,
+            true
+        )
+
+        audioCard.addView(
+            adhanStatusView,
+            LinearLayout.LayoutParams(-1, dp(55))
+        )
+
+        audioCard.addView(
+            makeButton("▶ پخش اذان") {
+                playOnlineAdhan()
+            },
+            LinearLayout.LayoutParams(-1, dp(52)).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(10)
+            }
+        )
+
+        audioCard.addView(
+            makeButton("■ توقف اذان") {
+                stopOnlineAdhan()
+                updateAdhanStatus("پخش اذان متوقف شد")
+            },
+            LinearLayout.LayoutParams(-1, dp(52))
+        )
+
+        body.addView(
+            audioCard,
+            LinearLayout.LayoutParams(-1, -2).apply {
+                topMargin = dp(8)
+                bottomMargin = dp(18)
+            }
+        )
+
         body.addView(
             makeText(
                 "برای دریافت زمان دقیق، موقعیت مکانی و اینترنت را فعال کنید.",
@@ -549,6 +631,87 @@ class MainActivity : Activity() {
                 muted
             )
         )
+    }
+
+    // شروع پخش آنلاین اذان
+    private fun playOnlineAdhan() {
+
+        stopOnlineAdhan()
+
+        updateAdhanStatus("در حال اتصال به فایل صوتی...")
+
+        try {
+            val media = MediaPlayer()
+            adhanPlayer = media
+
+            media.setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(
+                        AudioAttributes.CONTENT_TYPE_MUSIC
+                    )
+                    .build()
+            )
+
+            media.setOnPreparedListener { mp ->
+                if (adhanPlayer === mp) {
+                    mp.start()
+                    updateAdhanStatus("اذان در حال پخش است 🔊")
+                }
+            }
+
+            media.setOnCompletionListener { mp ->
+                if (adhanPlayer === mp) {
+                    mp.release()
+                    adhanPlayer = null
+                    updateAdhanStatus("پخش اذان به پایان رسید")
+                }
+            }
+
+            media.setOnErrorListener { mp, _, _ ->
+                if (adhanPlayer === mp) {
+                    mp.release()
+                    adhanPlayer = null
+                }
+
+                updateAdhanStatus(
+                    "خطا در پخش؛ اینترنت یا آدرس صوت را بررسی کنید"
+                )
+                true
+            }
+
+            media.setDataSource(adhanUrl)
+            media.prepareAsync()
+
+        } catch (e: Exception) {
+            stopOnlineAdhan()
+            updateAdhanStatus("اتصال به فایل صوتی ناموفق بود")
+        }
+    }
+
+    // توقف پخش
+    private fun stopOnlineAdhan() {
+        val oldPlayer = adhanPlayer
+        adhanPlayer = null
+
+        try {
+            oldPlayer?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+                it.reset()
+                it.release()
+            }
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun updateAdhanStatus(message: String) {
+        adhanStatus = message
+
+        runOnUiThread {
+            adhanStatusView?.text = message
+        }
     }
 
     private fun showWeather() {
@@ -848,6 +1011,12 @@ class MainActivity : Activity() {
         }
 
         return "$jd / $jm / $jy"
+    }
+
+    override fun onDestroy() {
+        stopOnlineAdhan()
+        adhanStatusView = null
+        super.onDestroy()
     }
 
     // رسم مسجد، گنبد، مناره، ماه و ستاره
