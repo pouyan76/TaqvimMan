@@ -1,7 +1,21 @@
 
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
+val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+
+val releaseKeystoreFile = layout.buildDirectory.file("release/taqvimyar-plus.jks")
+
+if (!keystoreBase64.isNullOrBlank()) {
+    val keystoreBytes = Base64.getDecoder().decode(keystoreBase64)
+    val keystore = releaseKeystoreFile.get().asFile
+    keystore.parentFile.mkdirs()
+    keystore.writeBytes(keystoreBytes)
 }
 
 android {
@@ -14,6 +28,26 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+    }
+
+    signingConfigs {
+        create("release") {
+            if (!keystoreBase64.isNullOrBlank()) {
+                storeFile = releaseKeystoreFile.get().asFile
+                storePassword = keystorePassword
+                keyAlias = "taqvimyar"
+                keyPassword = keystorePassword
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            if (!keystoreBase64.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            isMinifyEnabled = false
+        }
     }
 
     compileOptions {
