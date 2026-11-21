@@ -9,11 +9,17 @@ plugins {
 val keystoreBase64 = System.getenv("KEYSTORE_BASE64")
 val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
 
-val releaseKeystoreFile = layout.buildDirectory.file("release/taqvimyar-plus.jks")
+val releaseKeystoreFile =
+    layout.buildDirectory.file("release/taqvimyar-plus.jks")
 
 if (!keystoreBase64.isNullOrBlank()) {
-    val keystoreBytes = Base64.getDecoder().decode(keystoreBase64)
+    val cleanBase64 = keystoreBase64.filter {
+        it in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
+    }
+
+    val keystoreBytes = Base64.getDecoder().decode(cleanBase64)
     val keystore = releaseKeystoreFile.get().asFile
+
     keystore.parentFile.mkdirs()
     keystore.writeBytes(keystoreBytes)
 }
