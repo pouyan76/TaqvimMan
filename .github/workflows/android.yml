@@ -1,10 +1,14 @@
-name: Build Android APK
+
+name: Build Signed TaqvimYar Plus APK
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -25,12 +29,36 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build APK
-        run: gradle assembleDebug
+      - name: Check signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          set -e
 
-      - name: Upload APK
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ERROR: KEYSTORE_BASE64 is empty"
+            exit 1
+          fi
+
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "ERROR: KEYSTORE_PASSWORD is empty"
+            exit 1
+          fi
+
+          echo "Signing secrets are available"
+
+      - name: Build signed release APK
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          gradle --no-daemon assembleRelease
+
+      - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: TaqvimYar-Plus-APK
-          path: app/build/outputs/apk/debug/*.apk
+          name: TaqvimYar-Plus-Signed-APK
+          path: app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+          retention-days: 7
